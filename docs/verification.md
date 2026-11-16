@@ -120,13 +120,40 @@ layout. Its API container image built successfully, but the startup probe failed
 on a connection reset before the server was ready. The API and frontend probes
 now share a bounded readiness helper that retries transient transport errors
 while preserving exact HTTP/status checks and the deadline. Sixteen regression
-cases cover that change. Final container and browser results are recorded below
-when observed; image build success alone is not a passing smoke check.
+cases cover that change. The final CI results below include actual container
+startup checks, not only image builds.
 
-Container smoke checks and the blocking SonarQube gate remain separate from
-local compilation/tests. A missing SonarQube server/token must still fail CI
-and deployment. Refer to the actual linked workflow result rather than treating
-test coverage or a successful build as a passed SonarQube gate.
+### Final console CI result
+
+The [final application verification run](https://github.com/mahi80/DataMigration/actions/runs/43834230987)
+checked commit [`19bd99d`](https://github.com/mahi80/DataMigration/commit/19bd99dc73a0ff843b015c6a488a9ea3e5920e17)
+with the following observed results:
+
+| CI check | Observed result |
+| --- | --- |
+| Backend and deployment-probe tests | **269 passed**, 75% combined branch-aware package coverage |
+| Python lint, syntax, wheel and source distribution | Passed |
+| Frontend lint, TypeScript and production build | Passed |
+| Frontend unit tests | **16 passed** |
+| Chromium and real HTTP integration | **11 passed**: eight browser scenarios and three HTTP scenarios |
+| API container | Built and started; health, unauthenticated-call rejection and shared persistent maintenance barrier passed |
+| Frontend container | Built and started; HTTP process/configuration health passed |
+| SonarQube configuration | **Blocked**: `Configure SONAR_HOST_URL as the approved HTTPS SonarQube server URL` |
+| SonarQube scan and quality gate | **Not run** because configuration is missing |
+
+The expanded browser checks verify that a dragged Ask Q panel stays separate
+from its launcher and that an external approval detected by the watcher refreshes
+the underlying migration view and removes stale approval controls. Actual
+Chromium screenshots of the desktop workflow, mobile layout and Ask Q panels
+were inspected. The local Docker limitation is therefore separate from these
+successful GitHub container checks; no AWS/Azure deployment was performed.
+
+The workflow's overall conclusion remains **failure** at the required SonarQube
+configuration step. Configure repository variable `SONAR_HOST_URL` and secret
+`SONAR_TOKEN` using [CI/CD](cicd.md), then rerun and inspect the actual analysis
+and quality-gate result. Application tests do not establish a passed SonarQube
+gate. This verification-record update changes documentation only; the linked
+run identifies the tested application commit explicitly.
 
 The video is a caption-led motion-graphic walkthrough using labeled workflow
 illustrations and the actual SVG mascot. Its source, subtitles and transcript
