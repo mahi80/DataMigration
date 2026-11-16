@@ -1,0 +1,23 @@
+1
+00:00:00,000 --> 00:00:05,000
+Discover: the engine scans and profiles source tables before anything moves.
+
+2
+00:00:05,000 --> 00:00:10,000
+Plan: explicit typed mappings and lineage are drafted for operator review.
+
+3
+00:00:10,000 --> 00:00:15,000
+Approve: a human signs off on the exact plan hash. Nothing runs unsigned.
+
+4
+00:00:15,000 --> 00:00:22,000
+Migrate: deterministic workers stage, snapshot, and write keyed upserts.
+
+5
+00:00:22,000 --> 00:00:27,000
+Reconcile: every mapped row is compared by key before success is claimed.
+
+6
+00:00:27,000 --> 00:00:30,000
+Report: an auditable outcome with receipts, for every run.

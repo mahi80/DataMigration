@@ -1,5 +1,9 @@
 # DataMigration
 
+<p align="center">
+  <video src="docs/video/datamigration-walkthrough.mp4" width="720" controls muted playsinline></video>
+</p>
+
 A **LangGraph-based migration workbench** for discovering source and target tables,
 reviewing mappings, approving a precise plan, moving data through deterministic
 workers, and reconciling the result. It includes AWS, Azure and Databricks job
