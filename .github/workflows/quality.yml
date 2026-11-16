@@ -20,9 +20,9 @@ permissions:
 
 jobs:
   quality:
-    name: Tests, image and SonarQube gate
+    name: Backend, console and SonarQube gate
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - name: Check out reviewed source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -34,21 +34,12 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - name: Verify SonarQube configuration
-        if: inputs.run_sonar
-        env:
-          SONAR_HOST_URL: ${{ inputs.sonar_host_url }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          python - <<'PY'
-          import os
-          from urllib.parse import urlparse
-          url = urlparse(os.environ.get('SONAR_HOST_URL', ''))
-          if url.scheme != 'https' or not url.hostname or url.username or url.password:
-              raise SystemExit('Configure SONAR_HOST_URL as the approved HTTPS SonarQube server URL')
-          if not os.environ.get('SONAR_TOKEN'):
-              raise SystemExit('Configure the SONAR_TOKEN project-analysis secret; the gate cannot be skipped')
-          PY
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - name: Install the frozen dependency set
         run: |
           python -m pip install 'uv==0.13.6'
@@ -64,12 +55,103 @@ jobs:
           pytest --cov=datamigration --cov-config=infra/coverage.ini --cov-report=term-missing --cov-report=xml:coverage.xml --junitxml=reports/junit.xml
       - name: Build wheel and source distribution
         run: python -m build
+      - name: Install the locked frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Check frontend lint and TypeScript
+        working-directory: frontend
+        run: |
+          npm run lint
+          npm run typecheck
+      - name: Run frontend unit tests with coverage
+        working-directory: frontend
+        run: npm run test:coverage
+      - name: Normalize frontend coverage paths for repository analysis
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          root = Path.cwd()
+          report = root / 'frontend/coverage/lcov.info'
+          normalized = []
+          for line in report.read_text().splitlines():
+              if line.startswith('SF:'):
+                  source = Path(line[3:])
+                  if not source.is_absolute():
+                      source = root / source if source.parts[0] == 'frontend' else root / 'frontend' / source
+                  source = source.resolve()
+                  if not source.is_file() or not source.is_relative_to(root / 'frontend/src'):
+                      raise SystemExit('Frontend coverage refers to an unexpected source path')
+                  line = 'SF:' + source.relative_to(root).as_posix()
+              normalized.append(line)
+          report.write_text('\n'.join(normalized) + '\n')
+          PY
+      - name: Build the production frontend
+        working-directory: frontend
+        run: npm run build
+      - name: Install the browser test runtime
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Exercise the console against a synthetic API
+        working-directory: frontend
+        run: npm run test:e2e
       - name: Build and exercise API image
         env:
           SOURCE_SHA: ${{ github.sha }}
         run: |
           docker build --tag "datamigration-ci:$SOURCE_SHA" .
           python infra/deploy/smoke_image.py "datamigration-ci:$SOURCE_SHA"
+      - name: Build and check frontend image health
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          docker build --tag "datamigration-console-ci:$SOURCE_SHA" frontend
+          console_name="migration-console-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          trap 'docker rm --force "$console_name" >/dev/null 2>&1 || true' EXIT
+          MIGRATION_UI_SESSION_SECRET="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+          export MIGRATION_UI_SESSION_SECRET
+          docker run --detach --name "$console_name" --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m --cap-drop ALL \
+            --security-opt no-new-privileges --publish 127.0.0.1::3000 \
+            --env MIGRATION_UI_SESSION_SECRET \
+            --env MIGRATION_UI_ORIGIN=http://127.0.0.1:3000 \
+            --env MIGRATION_API_URL=http://127.0.0.1:8000 \
+            "datamigration-console-ci:$SOURCE_SHA" >/dev/null
+          CONSOLE_TEST_PORT="$(docker port "$console_name" 3000/tcp)"
+          export CONSOLE_TEST_PORT
+          python - <<'PY'
+          import json, os, time, urllib.error, urllib.request
+          port = os.environ['CONSOLE_TEST_PORT'].splitlines()[0].rsplit(':', 1)[1]
+          if not port.isdecimal():
+              raise SystemExit('Unexpected frontend container port')
+          origin = 'http://127.0.0.1:' + port
+          deadline = time.monotonic() + 60
+          while time.monotonic() < deadline:
+              try:
+                  with urllib.request.urlopen(origin + '/api/health', timeout=3) as response:
+                      if response.status == 200 and json.load(response).get('status') == 'ok':
+                          print('Frontend process and configuration health passed; backend readiness is checked separately')
+                          break
+              except (urllib.error.URLError, TimeoutError):
+                  pass
+              time.sleep(1)
+          else:
+              raise SystemExit('Frontend image did not become healthy')
+          PY
+      - name: Verify SonarQube configuration
+        if: inputs.run_sonar
+        env:
+          SONAR_HOST_URL: ${{ inputs.sonar_host_url }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          python - <<'PY'
+          import os
+          from urllib.parse import urlparse
+          url = urlparse(os.environ.get('SONAR_HOST_URL', ''))
+          if url.scheme != 'https' or not url.hostname or url.username or url.password:
+              raise SystemExit('Configure SONAR_HOST_URL as the approved HTTPS SonarQube server URL')
+          if not os.environ.get('SONAR_TOKEN'):
+              raise SystemExit('Configure the SONAR_TOKEN project-analysis secret; the gate cannot be skipped')
+          PY
       - name: Analyze and wait for the SonarQube quality gate
         if: inputs.run_sonar
         uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
@@ -90,5 +172,8 @@ jobs:
             coverage.xml
             reports/junit.xml
             dist/
+            frontend/coverage/
+            frontend/playwright-report/
+            frontend/test-results/
           if-no-files-found: ignore
           retention-days: 7

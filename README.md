@@ -3,10 +3,11 @@
 A **LangGraph-based migration workbench** for discovering source and target tables,
 reviewing mappings, approving a precise plan, moving data through deterministic
 workers, and reconciling the result. It includes AWS, Azure and Databricks job
-adapters, an authenticated API, MCP, A2A, data-quality rules, and governance exports.
+adapters, a **Next.js operator console**, an authenticated API, MCP, A2A,
+data-quality rules, and governance exports.
 
-**Release scope:** a runnable v0.1 reference implementation with real local
-integration tests and remote-adapter contract tests. It is not a certification of
+**Release scope:** the runnable v0.1 migration engine plus a Next.js console,
+with real local integration tests and remote-adapter contract tests. It is not a certification of
 every database pair or a fully managed migration service. The implemented control
 plane runs on **one host with a durable local state directory**. Network database
 connectors and cloud deployments need qualification in your environment.
@@ -15,6 +16,7 @@ connectors and cloud deployments need qualification in your environment.
 
 | Goal | Guide |
 | --- | --- |
+| Open the operator console | [Next.js quickstart](#nextjs-console) and [frontend setup](docs/frontend.md) |
 | Run a migration and understand approval/validation | [Quickstart](#quickstart) and [migration workflow](#migrate-your-data) |
 | Choose source/target databases, files and supported types | [Connector matrix and contracts](docs/connectors.md) |
 | Model OLTP, OLAP, facts and dimensions | [Data models](docs/data-models.md) |
@@ -24,7 +26,8 @@ connectors and cloud deployments need qualification in your environment.
 | Deploy in AWS, Azure or Databricks | [AWS](docs/architecture/aws.md), [Azure](docs/architecture/azure.md), [Databricks](docs/architecture/databricks.md) |
 | Install CI/CD and SonarQube gates | [CI/CD](docs/cicd.md) and [host deployment](infra/deploy/README.md) |
 | Review what was actually tested | [Verification record](docs/verification.md) |
-| Choose a platform based on cost and operating needs | [Platform selection and paid-tool comparison](docs/platform-selection.md) |
+| Choose a platform based on cost and operating needs | [Platform selection and cost](docs/platform-selection.md) |
+| Prioritize the remaining production work | [Product gaps and roadmap](docs/roadmap.md) |
 
 ## What the agent does
 
@@ -96,6 +99,42 @@ The star fixture materializes `dim_customer`, `dim_product` and `fact_sales` usi
 reviewed example SQL, then migrates those three tables. It demonstrates dimension
 ordering and fact preservation; it does not infer arbitrary business joins or
 generate SCD Type 2 history.
+
+## Next.js console
+
+The responsive console connects to the real API for run history, registered
+connections, table discovery, mapping review, exact-hash approvals and validation
+results. It provides role-aware controls, loading/error/empty states, and
+source-to-target lineage inspection. Overview metrics describe the loaded runs;
+they are not synthetic production statistics.
+
+For a local demonstration, use Node.js 22.12 or later in the 22.x series and the
+Python environment above:
+
+```bash
+python -m pip install -e '.[api]'
+npm --prefix frontend ci
+python examples/console/serve_demo.py --directory .demo/console
+```
+
+Open **http://localhost:3000** and sign in with the demo administrator token
+printed by the launcher. Other role tokens are saved privately in
+`.demo/console/demo-access.json` so you can exercise planner/approver separation.
+The launcher creates actual synthetic runs, including completed migrations,
+plans awaiting review and an intentionally failed quality rule. It starts the
+API and Next.js together; no cloud or external database is used. Use a fresh
+`--directory` when repeating the demo.
+
+For your own workspace, configure the API's `MIGRATION_CONNECTIONS` registry and
+role-token bindings, then set the frontend's fixed API URL, public origin and
+session-encryption secret. The browser uses an encrypted HTTP-only session
+cookie; source credentials remain with the API. Follow
+[frontend setup](docs/frontend.md) for the complete configuration and test commands.
+
+The console currently manages snapshot migrations. Native cloud execution stays
+in the existing cloud CLI/Python interfaces. Enterprise SSO, durable queued
+execution, distributed state and other production priorities are tracked in
+[the roadmap](docs/roadmap.md).
 
 ## Source and target coverage
 
@@ -342,16 +381,23 @@ and database/cloud identities enforce access. Neither replaces reconciliation.
 
 ## Deployment and CI/CD
 
-The supplied deployable topology is a **single container on an existing AWS EC2
+The cloud rollout scripts deploy **one API container on an existing AWS EC2
 instance or Azure VM with a local encrypted disk**. It preserves SQLite checkpoints,
 staging and receipt ledgers under `/state`. Do not place SQLite WAL state on
 EFS/Azure Files, use multiple replicas, or let multiple control planes write the
 same destination. A distributed PostgreSQL-backed state/locking architecture is
 documented as future work; it is not implemented by changing an environment variable.
 
+The Next.js console runs as a separate companion container. The root
+`compose.console.yml` provides a local single-host composition with private API
+networking and loopback ports. Existing AWS/Azure rollout scripts still deploy
+the API image only; frontend registry publication, TLS ingress and companion
+rollout need the reviewed extension described in [frontend deployment](docs/frontend.md#containers-and-cloud-placement).
+
 The workflows provide:
 
-1. Ruff, meaningful tests with coverage, package build and container smoke test.
+1. Python/frontend lint, TypeScript checks, unit coverage, browser workflows,
+   package builds and both application image checks.
 2. SonarQube analysis with `sonar.qualitygate.wait=true`.
 3. OIDC-based ECR/ACR publication and immutable image-digest deployment.
 4. Separate build/deploy identities and protected GitHub deployment environments.
@@ -408,15 +454,11 @@ service compatibility for a particular customer's schema.
   receipts until their migrations can no longer be retried.
 - **Cost:** model calls are optional, but compute, storage, network, native jobs,
   operations and support still cost money. See [platform selection](docs/platform-selection.md)
-  for decision criteria and an honest comparison with commercial platforms.
+  for workload choices and cost decision criteria.
 
 ## Design references
 
-The design uses public documentation and independently written code. Turgon's
-public [framework discussion](https://www.turgon.ai/post/langchain-langgraph-or-custom-choosing-the-right-agentic-framework)
-describes using LangGraph as its agents matured and custom workflows for some
-services. That supports the general orchestration direction; it does not reveal
-its proprietary migration implementation or establish equivalent capabilities.
+The design uses public documentation and independently written code.
 LangGraph's [persistence](https://docs.langchain.com/oss/python/langgraph/persistence)
 and [interrupt](https://docs.langchain.com/oss/python/langgraph/interrupts)
 documentation informs the checkpoint/approval design. Provider-specific sources

@@ -1,0 +1,33 @@
+# Single-host pilot. Configure the two ignored runtime env files before starting.
+services:
+  api:
+    build:
+      context: .
+    env_file:
+      - ${MIGRATION_API_ENV_FILE:-.env.console-api}
+    environment:
+      MIGRATION_STATE_DIR: /state
+    volumes:
+      - migration-state:/state
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  console:
+    build:
+      context: ./frontend
+    env_file:
+      - ${MIGRATION_UI_ENV_FILE:-.env.console-ui}
+    environment:
+      MIGRATION_API_URL: http://api:8000
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+volumes:
+  migration-state:

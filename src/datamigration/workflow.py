@@ -18,6 +18,7 @@ from pydantic import ValidationError
 
 from .advisor import advise
 from .connectors.base import ConnectorError
+from .console import utc_now
 from .engine import build_plan, discover, execute_snapshot, validate_plan
 from .ledger import Ledger
 from .maintenance import submission_guard
@@ -152,6 +153,7 @@ class RunManager:
         metadata = json.loads(meta_path.read_text())
         metadata.pop("error", None)
         metadata["status"] = "RUNNING"
+        metadata["updated_at"] = utc_now()
         with submission_guard(self.workspace):
             write_json(meta_path, metadata)
         try:
@@ -162,8 +164,10 @@ class RunManager:
         except Exception as exc:
             metadata["status"] = "FAILED"
             metadata["error"] = safe_error(exc, metadata.get("spec"))
+            metadata["updated_at"] = utc_now()
             write_json(meta_path, metadata)
             raise
+        metadata["updated_at"] = utc_now()
         write_json(meta_path, metadata)
         return self.status(run_id)
 
@@ -173,7 +177,8 @@ class RunManager:
         directory.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         with FileLock(str(directory) + ".lock", timeout=0):
             directory.mkdir(mode=0o700)
-            write_json(directory / "run.json", {"run_id": run_id, "status": "CREATED", "spec": spec.model_dump(mode="json")})
+            created_at = utc_now()
+            write_json(directory / "run.json", {"run_id": run_id, "status": "CREATED", "spec": spec.model_dump(mode="json"), "created_at": created_at, "updated_at": created_at})
             return self._invoke(run_id, {"run_id": run_id, "spec": spec.model_dump(mode="json"), "phase": "CREATED"})
 
     def decide(self, run_id: str, *, approved: bool, plan_hash: str, reviewer: str) -> dict:

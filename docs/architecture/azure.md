@@ -17,12 +17,16 @@ not been performed as part of this release.
 
 ## Shipped pilot deployment
 
-The GitHub workflow publishes a smoke-tested image to ACR after tests and a green
+The API GitHub workflow publishes a smoke-tested image to ACR after tests and a green
 SonarQube gate. A protected environment then approves the exact image digest;
 a separate federated identity invokes Azure Run Command on one existing VM.
 The VM pulls with its own managed identity and stores the workspace on a locally
 mounted encrypted managed disk. Azure Files is not supported for this SQLite
 workspace.
+
+The Next.js console is a companion Node.js container in the runtime layout.
+The existing Run Command rollout manages the API image; frontend publication
+and rollout must be added through a separately reviewed release process.
 
 ```mermaid
 flowchart TD
@@ -32,7 +36,8 @@ flowchart TD
     ACR --> VM["One Azure VM API and LangGraph container"]
     Command --> VM
     User["Authorized operator"] --> Proxy["Private TLS ingress and host proxy"]
-    Proxy --> VM
+    Proxy --> Console["Next.js console and session routes"]
+    Console --> VM
     VM --> Disk["Local managed disk: SQLite, receipts and locks"]
     VM --> ADF["Approved Data Factory pipeline"]
 ```
@@ -43,11 +48,41 @@ deployment script drains control-plane work and preserves the local workspace;
 it does not cut over database traffic. See [CI/CD](../cicd.md) and the
 [host runbook](../../infra/deploy/README.md).
 
+### Adding the Next.js console
+
+Build `frontend/Dockerfile` and publish a reviewed image digest to an approved
+ACR repository. The shared quality workflow builds and checks this image; the
+existing `deploy-azure.yml` publishes and deploys the API image only. The local
+`compose.console.yml` starts both application services for a single-host pilot
+and does not provision Azure resources.
+
+For the VM pilot, route a trusted HTTPS reverse proxy to the console on loopback
+port 3000, and let the console reach FastAPI through private host/container
+networking. Set `MIGRATION_API_URL` to that fixed private API address,
+`MIGRATION_UI_ORIGIN` to the exact public HTTPS origin, and provide a random
+32-byte session secret as 64 hexadecimal characters in
+`MIGRATION_UI_SESSION_SECRET`. Deliver those values through protected runtime
+configuration. The frontend does not need the migration disk, database
+credentials, ADF submission rights or the API's broader managed-identity scope.
+
+The console uses encrypted HTTP-only cookies and checks its request origin;
+the Python API still enforces each role and connection/table scope. Entra ID
+SSO, tenant lifecycle and federated user-to-role mapping are planned work. An
+HTTPS proxy or a token sign-in form does not automatically supply that integration.
+
+Promote a compatible frontend/API pair with recorded image digests and browser
+smoke evidence. Continue to drain the API before replacing its container. A
+frontend restart does not stop a migration or authorize rollback of committed
+rows. The console's own health route validates its process/configuration, not
+database reachability. See [frontend setup](../frontend.md) for the connection
+registry, runtime settings and local test commands.
+
 ## Future production topology
 
 ```mermaid
 flowchart TD
-    Reviewer["Reviewer"] --> API["API with Entra authentication"]
+    Reviewer["Reviewer"] --> Console["Next.js console with Entra sign-in"]
+    Console --> API["Private API with verified identity"]
     API --> Graph["Container Apps: LangGraph control plane"]
     Graph --> State["Azure PostgreSQL checkpoints and ledger"]
     Graph --> Context["Catalog, definitions and mappings"]

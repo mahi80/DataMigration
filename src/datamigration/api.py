@@ -10,13 +10,14 @@ import json
 import os
 from typing import Any, Mapping
 
-from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 
 from .protocols.a2a import A2AService, PROTOCOL_VERSION, agent_card, rpc_error
+from .console import ConnectionRegistry, RunStatus
 from .protocols.service import DiscoveryRequest, MigrationService
 from .security import AuthenticationError, AuthorizationError, Principal, TokenAuthenticator
 from .spec import MigrationSpec, fingerprint
@@ -44,8 +45,10 @@ def create_app(
     *,
     token_roles: Mapping[str, Any] | None = None,
     a2a_base_url: str | None = None,
+    connection_profiles: list[dict[str, Any]] | None = None,
 ) -> FastAPI:
     authenticator = TokenAuthenticator.from_config(token, token_roles)
+    registry = ConnectionRegistry.from_config(connection_profiles)
     manager = RunManager(workspace)
     public_url = a2a_base_url or os.environ.get("MIGRATION_PUBLIC_URL", "http://127.0.0.1:8000")
     protocol = A2AService(manager, public_url)
@@ -101,6 +104,14 @@ def create_app(
     def connectors(operations: MigrationService = Depends(service)):
         return call(operations.connectors)
 
+    @app.get("/me")
+    def get_identity(operations: MigrationService = Depends(service)):
+        return call(operations.identity)
+
+    @app.get("/connections")
+    def get_connections(operations: MigrationService = Depends(service)):
+        return call(operations.connections, registry)
+
     @app.post("/discover")
     def discover(request: DiscoveryRequest, operations: MigrationService = Depends(service)):
         return call(operations.discover, request)
@@ -108,6 +119,15 @@ def create_app(
     @app.post("/runs")
     def start_run(request: RunRequest, operations: MigrationService = Depends(service)):
         return call(operations.start, request.spec, request.run_id)
+
+    @app.get("/runs")
+    def get_runs(
+        limit: int = Query(default=25, ge=1, le=100),
+        offset: int = Query(default=0, ge=0, le=5000),
+        status: RunStatus | None = None,
+        operations: MigrationService = Depends(service),
+    ):
+        return call(operations.runs, limit=limit, offset=offset, status=status)
 
     @app.get("/runs/{run_id}")
     def get_run(run_id: str, operations: MigrationService = Depends(service)):

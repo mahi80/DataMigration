@@ -12,6 +12,8 @@ dist
 build
 coverage.xml
 .coverage
+frontend
+node_modules
 __pycache__
 *.pyc
 *.properties

@@ -2,6 +2,9 @@
 
 The repository includes working GitHub Actions definitions for verification and
 for deploying an API image to an **existing single AWS EC2 host or Azure VM**.
+The shared verification also checks the Next.js console and its container.
+The existing cloud deployment jobs still publish and deploy the API image only;
+frontend companion rollout is described in [frontend setup](frontend.md).
 The deployment jobs do not create cloud resources or run data migrations. No
 SonarQube scan or live cloud deployment was executed during local verification.
 The first GitHub CI run reached the required configuration check and stopped
@@ -12,8 +15,8 @@ services below and qualify the pipeline in a pilot; no quality gate was bypassed
 
 ```mermaid
 flowchart TD
-    Source["Reviewed main commit"] --> Verify["Ruff, tests, coverage and package build"]
-    Verify --> Smoke["API image smoke test"]
+    Source["Reviewed main commit"] --> Verify["Python and frontend checks"]
+    Verify --> Smoke["Browser tests and both image checks"]
     Smoke --> Sonar["SonarQube analysis and blocking gate"]
     Sonar --> Build["Build and test deployment image"]
     Build --> Registry["Push to ECR or ACR by digest"]
@@ -35,7 +38,7 @@ review and update these pins as dependencies change.
 | Workflow | Trigger | Result |
 |---|---|---|
 | `ci.yml` | Pull requests to `main`, pushes to `main`, manual run | Calls the shared verification workflow. |
-| `quality.yml` | Reusable workflow only | Lint, tests, branch coverage, package build, API container smoke test, optional PR analysis or mandatory deployment/main Sonar gate. |
+| `quality.yml` | Reusable workflow only | Python/frontend lint, type checking, unit coverage, package/Next.js builds, real synthetic browser tests, both container checks, and the required main/deployment Sonar gate. |
 | `deploy-aws.yml` | Manual, `main` only | Mandatory quality gate; tested image to existing ECR; environment approval; SSM rollout to one host. |
 | `deploy-azure.yml` | Manual, `main` only | Mandatory quality gate; tested image to existing ACR; environment approval; Run Command rollout to one VM. |
 
@@ -74,6 +77,14 @@ the analysis step fail when the gate fails. See the official
 [GitHub integration](https://docs.sonarsource.com/sonarqube-server/2025.4/devops-platform-integration/github-integration/adding-analysis-to-github-actions-workflow)
 and [Python coverage guidance](https://docs.sonarsource.com/sonarqube-server/analyzing-source-code/test-coverage/python-test-coverage).
 
+Frontend Vitest coverage is written to `frontend/coverage/lcov.info`. CI
+normalizes its source paths to the repository root, then the scanner imports it
+through `sonar.javascript.lcov.reportPaths`. The same property covers JavaScript
+and TypeScript. Browser tests provide workflow evidence but do not automatically
+contribute LCOV coverage. Frontend application code is included in the analysis
+even where unit coverage remains incomplete. See the official
+[JavaScript/TypeScript coverage guide](https://docs.sonarsource.com/sonarqube-server/analyzing-source-code/test-coverage/javascript-typescript-test-coverage).
+
 CI and the container build use the checked-in dependency lock. Run the same
 verification commands in that locked environment locally:
 
@@ -86,12 +97,28 @@ bash -n infra/deploy/deploy_host.sh
 .venv/bin/python -m build
 docker build -t datamigration:review .
 .venv/bin/python infra/deploy/smoke_image.py datamigration:review
+cd frontend
+npm ci
+npm run lint
+npm run typecheck
+npm run test:coverage
+npm run build
+npx playwright install --with-deps chromium
+npm run test:e2e
+docker build -t datamigration-console:review .
 ```
 
 The smoke test uses disposable local state and a generated token. It checks API
 health, rejection of unauthenticated calls, and that the API and CLI share the
 maintenance barrier. Unit tests and smoke tests do not prove live database
 compatibility, IAM permission correctness, CDC behavior or cloud networking.
+
+The frontend image check supplies a generated session secret and checks
+`/api/health` for process/configuration health. It does not pretend a customer
+database or private API is reachable. The Playwright suite starts a real local
+FastAPI fixture and Next.js server for browser integration tests, using only
+synthetic data. The quality workflow retains frontend coverage and browser
+diagnostics alongside the Python reports.
 
 ## GitHub variables and secrets
 

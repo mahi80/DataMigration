@@ -11,11 +11,13 @@ provisioned and qualified for the actual migration.
 
 ## Shipped pilot deployment
 
-The deployment workflow targets one existing EC2 instance with encrypted local
+The API deployment workflow targets one existing EC2 instance with encrypted local
 EBS storage. It publishes a tested image to ECR, requires the configured GitHub
 environment approval, and uses a separate OIDC role to roll out through SSM.
 The container API is bound to loopback; an authenticated TLS ingress and host
-reverse proxy are infrastructure prerequisites.
+reverse proxy are infrastructure prerequisites. The Next.js console is a
+companion Node.js container. The runtime layout below includes it, while the
+existing SSM rollout still manages only the API image.
 
 ```mermaid
 flowchart TD
@@ -25,7 +27,8 @@ flowchart TD
     ECR --> EC2["One EC2 API and LangGraph container"]
     SSM --> EC2
     User["Authorized operator"] --> Proxy["Private TLS ingress and host proxy"]
-    Proxy --> EC2
+    Proxy --> Console["Next.js console and session routes"]
+    Console --> EC2
     EC2 --> EBS["Local EBS: SQLite, receipts and locks"]
     EC2 --> Native["Approved Step Functions workers"]
 ```
@@ -35,6 +38,35 @@ The rollout drains active control-plane calls before replacing the container and
 preserves provider operation IDs. It does not stop native migration jobs or
 authorize data cutover. Do not attach the SQLite workspace to EFS or operate it
 from multiple hosts.
+
+### Adding the Next.js console
+
+Build the frontend image from `frontend/Dockerfile` and publish it to a separate
+approved ECR repository through a reviewed release process. CI builds and checks
+the frontend image, but `deploy-aws.yml` does not yet publish or roll out that
+companion image. The root `compose.console.yml` provides a local two-service
+pilot; it is not an AWS provisioning or high-availability template.
+
+For the single EC2 pilot, route the trusted TLS proxy to the console's loopback
+port 3000, and keep the API on loopback/private container networking. Configure
+the console's fixed `MIGRATION_API_URL`, public HTTPS `MIGRATION_UI_ORIGIN`, and
+32-byte `MIGRATION_UI_SESSION_SECRET` through protected runtime configuration.
+The secret is represented as 64 hexadecimal characters. Give the frontend only
+these application settings, not source database secrets, the EBS workspace,
+Step Functions submission permissions or unrestricted AWS credentials.
+
+The frontend validates a workspace access token with the API, keeps it in an
+encrypted HTTP-only session cookie, and forwards supported requests. Backend
+roles and table scopes remain authoritative. Enterprise federation through a
+chosen identity provider is a further integration; the token sign-in form does
+not implement Cognito/OIDC by itself.
+
+Pin the frontend digest and verify compatibility with the deployed API before
+promotion. Updating the API still requires the maintenance/drain procedure;
+updating only the frontend does not cancel an already-running migration. The
+console's `/api/health` checks its configuration/process, while API health and
+browser end-to-end checks establish the rest of the application path. See
+[frontend setup](../frontend.md) for local commands and session configuration.
 
 ## Future production topology
 
@@ -46,7 +78,8 @@ state. The shipped deployment workflow targets the single EC2 pilot above.
 
 ```mermaid
 flowchart TD
-    User["Operator and reviewer"] --> API["Authenticated API"]
+    User["Operator and reviewer"] --> Console["Next.js console with enterprise identity"]
+    Console --> API["Private authenticated API"]
     API --> Graph["ECS Fargate: LangGraph control plane"]
     Graph --> State["RDS PostgreSQL state and execution ledger"]
     Graph --> Artifacts["Versioned S3 artifacts"]

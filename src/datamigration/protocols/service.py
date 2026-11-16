@@ -10,8 +10,9 @@ from typing import Literal
 from pydantic import Field
 
 from ..connectors import CONNECTOR_CAPABILITIES
+from ..console import ConnectionRegistry, RunStatus, list_runs
 from ..engine import connector, validate_plan
-from ..security import Principal, RolePolicy
+from ..security import ROLE_ACTIONS, Principal, RolePolicy
 from ..spec import Connection, Contract, MigrationSpec
 from ..workflow import RunManager
 
@@ -82,6 +83,19 @@ class MigrationService:
     def __init__(self, manager: RunManager, principal: Principal):
         self.manager = manager
         self.principal = principal
+
+    def identity(self) -> dict:
+        return {
+            "subject": self.principal.subject,
+            "role": self.principal.role.value,
+            "actions": sorted(ROLE_ACTIONS[self.principal.role]),
+        }
+
+    def connections(self, registry: ConnectionRegistry) -> dict:
+        return registry.visible_to(self.principal)
+
+    def runs(self, *, limit: int = 25, offset: int = 0, status: RunStatus | None = None) -> dict:
+        return list_runs(self.manager.workspace, self.principal, limit=limit, offset=offset, status=status)
 
     def connectors(self) -> dict:
         RolePolicy.require(self.principal, "connectors")
