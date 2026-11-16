@@ -1,0 +1,7 @@
+# Reproducible raster exports of the product SVG.
+assets/*.png
+__pycache__/
+*.mp4
+*.wav
+*.verification.json
+*contact-sheet*.jpg

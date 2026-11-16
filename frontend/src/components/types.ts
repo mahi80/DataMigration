@@ -1,3 +1,5 @@
+import { recordInteraction } from "./assistant-events";
+
 export interface Principal {
   subject: string;
   role: string;
@@ -183,13 +185,25 @@ export class ApiError extends Error {
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api/backend/${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
-    cache: "no-store",
-  });
+  const mutation = init?.method?.toUpperCase() === "POST";
+  const approval = mutation && /^runs\/[^/]+\/approval$/.test(path);
+  const retry = mutation && /^runs\/[^/]+\/retry$/.test(path);
+  if (approval) recordInteraction("approval_requested", "pending");
+  if (retry) recordInteraction("retry_requested", "pending");
+  let response: Response;
+  try {
+    response = await fetch(`/api/backend/${path}`, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...init?.headers },
+      cache: "no-store",
+    });
+  } catch (failure) {
+    if (!init?.signal?.aborted && path !== "assistant/chat") recordInteraction("request_failed", "failure");
+    throw failure;
+  }
   const data: unknown = await response.json().catch(() => null);
   if (!response.ok) {
+    if (path !== "assistant/chat") recordInteraction("request_failed", "failure");
     if (response.status === 401) window.dispatchEvent(new Event("migration-session-expired"));
     let message = "The request could not be completed. Refresh the run status before trying again.";
     if (data && typeof data === "object") {
@@ -202,6 +216,10 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(message, response.status);
   }
+  if (mutation && path === "discover") recordInteraction("discovery", "success");
+  if (mutation && path === "runs") recordInteraction("plan_created", "success");
+  if (approval) recordInteraction("approval_requested", "success");
+  if (retry) recordInteraction("retry_requested", "success");
   return data as T;
 }
 

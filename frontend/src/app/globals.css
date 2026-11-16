@@ -234,7 +234,10 @@ select { padding-right: 28px; }
 .search-field > svg { position: absolute; left: 12px; pointer-events: none; }
 .search-field input { display: block; padding-left: 36px; margin: 0 !important; width: 100%; height: 38px; min-height: 38px; font-size: 11px; font-weight: 400; }
 .table-count { margin-left: auto; font-size: 10px; color: #a3b09b; }
-.table-scroll { overflow-x: auto; overscroll-behavior-x: contain; width: 100%; }
+.run-table-wrap { min-width: 0; max-width: 100%; }
+/* Contain absolute screen-reader labels in wide table headers within this
+   scroller, rather than their static position widening the document. */
+.table-scroll { position: relative; overflow-x: auto; overscroll-behavior-x: contain; width: 100%; min-width: 0; max-width: 100%; }
 .data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 11px; }
 .data-table th { color: #96a38e; background: #fcfdfb; font-size: 9px; font-weight: 550; padding: 11px 20px; border-bottom: 1px solid #edf1e8; white-space: nowrap; }
 .data-table td { padding: 18px 20px; color: #6c7d60; border-bottom: 1px solid #edf1e7; vertical-align: middle; }

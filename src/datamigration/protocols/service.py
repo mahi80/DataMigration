@@ -9,6 +9,7 @@ from typing import Literal
 
 from pydantic import Field
 
+from ..assistant import AssistantConfig, AssistantRequest, chat
 from ..connectors import CONNECTOR_CAPABILITIES
 from ..console import ConnectionRegistry, RunStatus, list_runs
 from ..engine import connector, validate_plan
@@ -93,6 +94,9 @@ class MigrationService:
 
     def connections(self, registry: ConnectionRegistry) -> dict:
         return registry.visible_to(self.principal)
+
+    def chat(self, request: AssistantRequest, registry: ConnectionRegistry, config: AssistantConfig) -> dict:
+        return chat(self.manager.workspace, self.principal, registry, request, config)
 
     def runs(self, *, limit: int = 25, offset: int = 0, status: RunStatus | None = None) -> dict:
         return list_runs(self.manager.workspace, self.principal, limit=limit, offset=offset, status=status)

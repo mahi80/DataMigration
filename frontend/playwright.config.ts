@@ -13,7 +13,7 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 15_000 },
   reporter: [["list"], ["html", { open: "never" }]],
-  use: { baseURL, trace: "retain-on-failure", screenshot: "only-on-failure" },
+  use: { baseURL, trace: "retain-on-failure", screenshot: { mode: "only-on-failure", fullPage: true } },
   projects: [{
     name: "chromium",
     use: { ...devices["Desktop Chrome"], launchOptions: {

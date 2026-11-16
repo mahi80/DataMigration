@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 
+from .assistant import AssistantConfig, AssistantRequest
 from .protocols.a2a import A2AService, PROTOCOL_VERSION, agent_card, rpc_error
 from .console import ConnectionRegistry, RunStatus
 from .protocols.service import DiscoveryRequest, MigrationService
@@ -46,9 +47,11 @@ def create_app(
     token_roles: Mapping[str, Any] | None = None,
     a2a_base_url: str | None = None,
     connection_profiles: list[dict[str, Any]] | None = None,
+    assistant_config: dict[str, Any] | None = None,
 ) -> FastAPI:
     authenticator = TokenAuthenticator.from_config(token, token_roles)
     registry = ConnectionRegistry.from_config(connection_profiles)
+    assistant = AssistantConfig.from_config(assistant_config)
     manager = RunManager(workspace)
     public_url = a2a_base_url or os.environ.get("MIGRATION_PUBLIC_URL", "http://127.0.0.1:8000")
     protocol = A2AService(manager, public_url)
@@ -111,6 +114,10 @@ def create_app(
     @app.get("/connections")
     def get_connections(operations: MigrationService = Depends(service)):
         return call(operations.connections, registry)
+
+    @app.post("/assistant/chat")
+    def assistant_chat(request: AssistantRequest, operations: MigrationService = Depends(service)):
+        return call(operations.chat, request, registry, assistant)
 
     @app.post("/discover")
     def discover(request: DiscoveryRequest, operations: MigrationService = Depends(service)):

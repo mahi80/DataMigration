@@ -10,6 +10,9 @@ import { RunTable } from "./run-table";
 import type { Connection, ConnectorCapability, Health, Principal, RunList, RunSummary } from "./types";
 import { api, dateLabel, errorMessage, formatCount, kindName } from "./types";
 import { Brand, EmptyState, Loading, Metric, Notice } from "./ui";
+import { AskQ } from "./ask-q";
+import type { RunFocus } from "./ask-q";
+import { recordInteraction } from "./assistant-events";
 
 type View = "overview" | "migrations" | "connections" | "new" | "run";
 const docsUrl = "https://github.com/mahi80/DataMigration#readme";
@@ -27,6 +30,8 @@ export function MigrationConsole() {
   const [sessionError, setSessionError] = useState("");
   const [view, setView] = useState<View>("overview");
   const [selectedRun, setSelectedRun] = useState<string | null>(null);
+  const [runFocus, setRunFocus] = useState<{ section: RunFocus; nonce: number }>();
+  const focusSequence = useRef(0);
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [capabilities, setCapabilities] = useState<Record<string, ConnectorCapability>>({});
@@ -61,7 +66,7 @@ export function MigrationConsole() {
     }).then((session) => { if (live && session?.principal) setPrincipal(session.principal); })
       .catch(() => { if (live) setSessionError("We could not connect to the console. Please try again."); })
       .finally(() => { if (live) { const location = readLocation(); setView(location.view); setSelectedRun(location.run); setCheckingSession(false); } });
-    function restoreLocation() { const current = readLocation(); setView(current.view); setSelectedRun(current.run); setMobileMenu(false); }
+    function restoreLocation() { const current = readLocation(); setView(current.view); setSelectedRun(current.run); setRunFocus(undefined); setMobileMenu(false); recordInteraction("navigation", "success"); }
     function expired() { clearIdentity(); setSessionError("Your session has expired or access changed. Sign in again to continue."); }
     window.addEventListener("popstate", restoreLocation);
     window.addEventListener("migration-session-expired", expired);
@@ -102,8 +107,9 @@ export function MigrationConsole() {
     return () => window.clearInterval(timer);
   }, [principal, hasActive, refreshWorkspace]);
 
-  function navigate(next: View, run?: string) {
-    setView(next); setSelectedRun(run || null); setMobileMenu(false);
+  function navigate(next: View, run?: string, focus?: RunFocus) {
+    setView(next); setSelectedRun(run || null); setRunFocus(focus ? { section: focus, nonce: ++focusSequence.current } : undefined); setMobileMenu(false);
+    recordInteraction("navigation", "success");
     const query = run ? `?run=${encodeURIComponent(run)}` : next === "overview" ? "" : `?view=${next}`;
     window.history.pushState({}, "", `${window.location.pathname}${query}`);
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -151,10 +157,11 @@ export function MigrationConsole() {
           : view === "migrations" ? <><div className="page-heading"><div><span className="eyebrow">YOUR DATA JOURNEYS</span><h1>Migrations</h1><p>Review plans, follow execution, and inspect validated outcomes.</p></div><div className="heading-actions"><button className="button secondary" onClick={refreshWorkspace} disabled={refreshing}><RefreshCw size={16} className={refreshing ? "spin" : ""} />Refresh</button>{canPlan && <button className="button primary" onClick={() => navigate("new")} disabled={health?.draining}><Plus size={17} />New migration</button>}</div></div><section className="panel"><div className="panel-heading"><div className="inline-heading"><h2>Migration history</h2><span className="count-label">{formatCount(total)}</span></div><span className="muted small-text">Only runs permitted for your role</span></div><RunTable runs={runs} onOpen={(id) => navigate("run", id)} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} /></section></>
           : view === "connections" ? canDiscover ? <ConnectionsView connections={connections} capabilities={capabilities} /> : <Notice>Your role does not include connection discovery.</Notice>
           : view === "new" ? canPlan ? <MigrationWizard connections={connections} onCancel={() => navigate("migrations")} onCreated={(id) => { navigate("run", id); void refreshWorkspace(); }} /> : <Notice>Your role can review run outcomes. Creating plans requires a planner or operator identity.</Notice>
-          : selectedRun ? <RunDetailView key={`${principal.subject}:${selectedRun}`} id={selectedRun} principal={principal} summary={runs.find((run) => run.run_id === selectedRun)} onBack={() => { navigate("migrations"); void refreshWorkspace(); }} onUpdated={() => void refreshWorkspace()} /> : <EmptyState title="Choose a migration" description="Open a migration from its history to review the plan and result." />}
+          : selectedRun ? <RunDetailView key={`${principal.subject}:${selectedRun}`} id={selectedRun} principal={principal} summary={runs.find((run) => run.run_id === selectedRun)} focusRequest={runFocus} onBack={() => { navigate("migrations"); void refreshWorkspace(); }} onUpdated={() => void refreshWorkspace()} /> : <EmptyState title="Choose a migration" description="Open a migration from its history to review the plan and result." />}
       </main>
       <footer className="workspace-footer"><span><ShieldCheck size={13} />Plans are reviewed before destination writes.</span><a href="https://github.com/mahi80/DataMigration/blob/main/docs/verification.md" target="_blank" rel="noreferrer">Verification & scope<ArrowUpRight size={12} /></a></footer>
     </div>
+    <AskQ key={`${principal.subject}:${principal.role}:${principal.actions.join(",")}`} principal={principal} view={view} runId={selectedRun} onNavigate={navigate} />
   </div>;
 }
 

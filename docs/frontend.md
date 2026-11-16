@@ -17,6 +17,7 @@ workspace with invented production runs or success rates.
 | Connections | Inspect the registered source/target choices visible to the authenticated identity |
 | New migration | Discover source tables, edit explicit mappings and keys, assert a stable source, and create a plan |
 | Run detail | Inspect the exact plan, mapping lineage, quality rules, approval state and validation results |
+| Ask Q | Explain setup and authorized run evidence, propose existing workflow screens, and monitor a selected run while the workspace is open |
 
 The console controls **local snapshot migrations**. Native Glue, DMS, ADF and
 Databricks job orchestration remains available through the existing cloud CLI
@@ -182,6 +183,31 @@ Overview counts refer to the runs loaded by the console, rather than an
 unbounded organization-wide analytics store. Per-table reports show actual
 mapped-row reconciliation and correction counts. No throughput or cost estimate
 is inferred from a small synthetic example.
+
+## Ask Q companion
+
+Select the draggable **Ask Q** character for setup guidance, connector/quality
+questions and an explanation of the selected run. Its default **Guided mode**
+uses local curated help with repository links and fresh authorized server
+artifacts. No model account is required. Optional server configuration lets a
+model choose existing help-card IDs; it cannot generate code or execute actions.
+
+**Prepare a plan**, **Review the exact plan** and **Review recovery** open the
+existing wizard or run section. Review checkboxes, exact-hash approval, explicit
+confirmation dialogs and backend role checks remain in force.
+
+Use **Start** under **Monitor this run** for read-only checks every eight seconds.
+Checks continue with Q minimized, pause when the browser tab is hidden, and stop
+on terminal completion/rejection, API failure, run/identity change or leaving the
+workspace. The character displays monitoring and status-change indicators.
+
+Drag with mouse/touch, or focus the character and use arrows, Shift + arrows or
+Home to position it. Reduced-motion preferences are respected. Only position is
+persisted in browser storage; chat and recent-action context are kept in memory.
+See [Ask Q](ask-q.md) for the complete workflow, privacy boundaries, keyboard
+controls and server-only `MIGRATION_ASSISTANT_CONFIG` options. The
+[60-second walkthrough sources](video/README.md) include the storyboard, captions,
+transcript and reusable renderer; the MP4 is distributed separately.
 
 ## Build, browser tests and SonarQube
 

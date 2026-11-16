@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import type { Connection, Discovery, MigrationSpec, QualityRule, RunDetail, TableMapping, TableSchema } from "./types";
 import { api, errorMessage, kindName } from "./types";
 import { DatabaseGlyph, EmptyState, Notice, StepIndicator } from "./ui";
+import { recordInteraction } from "./assistant-events";
 
 const dataTypes = ["integer", "float", "decimal", "string", "boolean", "datetime", "date", "json", "binary"];
 const transforms = ["identity", "trim", "lower", "upper", "to_string", "to_integer", "to_decimal", "to_datetime", "json_encode"];
@@ -86,10 +87,12 @@ export function MigrationWizard({ connections, onCancel, onCreated }: { connecti
   }
 
   function updateMapping(index: number, update: Partial<TableMapping>) {
+    recordInteraction("mapping_edited");
     setMappings((current) => current.map((mapping, position) => position === index ? { ...mapping, ...update } : mapping));
   }
 
   function updateColumn(tableIndex: number, columnIndex: number, update: Partial<TableMapping["columns"][number]>) {
+    recordInteraction("mapping_edited");
     setMappings((current) => current.map((mapping, index) => {
       if (index !== tableIndex) return mapping;
       const previousName = mapping.columns[columnIndex].target;

@@ -4,6 +4,7 @@ const config: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
+  devIndicators: false,
   async headers() {
     return [{
       source: "/:path*",

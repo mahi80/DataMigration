@@ -1,0 +1,55 @@
+1
+00:00:00,000 --> 00:00:03,000
+Migration is a team effort.
+
+2
+00:00:03,000 --> 00:00:06,000
+Bring plans, approvals and evidence into one workspace.
+
+3
+00:00:06,000 --> 00:00:10,500
+Discover registered sources and targets.
+
+4
+00:00:10,500 --> 00:00:15,000
+Choose tables, map columns and define quality rules.
+
+5
+00:00:15,000 --> 00:00:19,500
+An authorized reviewer inspects the exact plan.
+
+6
+00:00:19,500 --> 00:00:24,000
+Execution follows approval of that plan fingerprint.
+
+7
+00:00:24,000 --> 00:00:28,500
+Ask Q guides setup and follows the selected, authorized run.
+
+8
+00:00:28,500 --> 00:00:33,000
+It proposes next steps. You confirm permitted actions.
+
+9
+00:00:33,000 --> 00:00:37,500
+Compare mapped data and inspect recorded quality outcomes.
+
+10
+00:00:37,500 --> 00:00:42,000
+Keep reconciliation scope, corrections and lineage visible.
+
+11
+00:00:42,000 --> 00:00:46,500
+Follow reference architectures for AWS, Azure and Databricks.
+
+12
+00:00:46,500 --> 00:00:51,000
+Native cloud jobs use CLI or Python and need environment qualification.
+
+13
+00:00:51,000 --> 00:00:55,500
+Explore the framework and run the synthetic local demo.
+
+14
+00:00:55,500 --> 00:01:00,000
+github.com/mahi80/DataMigration

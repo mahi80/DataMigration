@@ -3,7 +3,7 @@
 A **LangGraph-based migration workbench** for discovering source and target tables,
 reviewing mappings, approving a precise plan, moving data through deterministic
 workers, and reconciling the result. It includes AWS, Azure and Databricks job
-adapters, a **Next.js operator console**, an authenticated API, MCP, A2A,
+adapters, a **Next.js operator console with Ask Q**, an authenticated API, MCP, A2A,
 data-quality rules, and governance exports.
 
 **Release scope:** the runnable v0.1 migration engine plus a Next.js console,
@@ -17,6 +17,8 @@ connectors and cloud deployments need qualification in your environment.
 | Goal | Guide |
 | --- | --- |
 | Open the operator console | [Next.js quickstart](#nextjs-console) and [frontend setup](docs/frontend.md) |
+| Get contextual setup/status guidance | [Ask Q companion](docs/ask-q.md) |
+| Review or render the 60-second walkthrough | [Video sources, captions and transcript](docs/video/README.md) |
 | Run a migration and understand approval/validation | [Quickstart](#quickstart) and [migration workflow](#migrate-your-data) |
 | Choose source/target databases, files and supported types | [Connector matrix and contracts](docs/connectors.md) |
 | Model OLTP, OLAP, facts and dimensions | [Data models](docs/data-models.md) |
@@ -108,6 +110,14 @@ results. It provides role-aware controls, loading/error/empty states, and
 source-to-target lineage inspection. Overview metrics describe the loaded runs;
 they are not synthetic production statistics.
 
+**Ask Q** is an animated, draggable SVG companion for setup, supported-feature
+questions and authorized run evidence. Guided mode works locally; an optional
+model only selects existing help-card IDs. Suggestions open the existing
+wizard, exact-plan review or confirmed recovery flow. Opt-in status checks run
+every eight seconds while the workspace is open, including with Q minimized,
+and pause when the browser tab is hidden. See [Ask Q](docs/ask-q.md) for its
+controls, context/privacy boundaries and server-only configuration.
+
 For a local demonstration, use Node.js 22.12 or later in the 22.x series and the
 Python environment above:
 
@@ -135,6 +145,10 @@ The console currently manages snapshot migrations. Native cloud execution stays
 in the existing cloud CLI/Python interfaces. Enterprise SSO, durable queued
 execution, distributed state and other production priorities are tracked in
 [the roadmap](docs/roadmap.md).
+
+The [60-second product walkthrough](docs/video/README.md) has a reusable renderer,
+the actual Ask Q SVG, captions, storyboard and text transcript. The MP4 is
+delivered separately; the repository keeps the reproducible source assets.
 
 ## Source and target coverage
 

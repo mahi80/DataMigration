@@ -3,6 +3,19 @@ import { expect, test, type Page } from "@playwright/test";
 const token = (role: string) => `synthetic-console-${role}-token-for-local-e2e-only`;
 const origin = "http://127.0.0.1:3137";
 
+async function expectNoPageOverflow(page: Page) {
+  const layout = await page.evaluate(() => ({
+    width: document.documentElement.scrollWidth,
+    viewport: window.innerWidth,
+    overflowing: [...document.querySelectorAll("body *")].flatMap((element) => {
+      const bounds = element.getBoundingClientRect(), style = getComputedStyle(element);
+      if (!bounds.width || style.display === "none" || style.visibility === "hidden" || bounds.right <= innerWidth + 1) return [];
+      return [{ tag: element.tagName, class: element.getAttribute("class"), width: Math.round(bounds.width), right: Math.round(bounds.right), overflowX: style.overflowX, parent: element.parentElement?.getAttribute("class") }];
+    }).slice(0, 30),
+  }));
+  expect(layout.width, JSON.stringify(layout, null, 2)).toBeLessThanOrEqual(layout.viewport);
+}
+
 async function signIn(page: Page, role: string) {
   await page.goto("/");
   await page.getByLabel("Workspace access token").fill(token(role));
@@ -108,7 +121,7 @@ test("rejection requires a deliberate confirmation and never executes the plan",
 test("mobile navigation and failure filters stay usable without page overflow", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, "admin");
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await expectNoPageOverflow(page);
   await page.screenshot({ path: testInfo.outputPath("overview-mobile.png"), fullPage: true });
   await page.getByRole("button", { name: "Open navigation", exact: true }).click();
   await page.getByRole("button", { name: "Migrations", exact: false }).filter({ hasText: "Migrations" }).click();
@@ -117,7 +130,7 @@ test("mobile navigation and failure filters stay usable without page overflow", 
   await page.getByRole("button", { name: "Price policy check", exact: true }).click();
   await expect(page.getByText("The run needs attention.", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Retry run", exact: true })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await expectNoPageOverflow(page);
 });
 
 test("cross-origin requests and invalid identities cannot establish or mutate a session", async ({ page }) => {

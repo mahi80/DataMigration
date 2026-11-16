@@ -1,4 +1,6 @@
-# v0.1 verification record
+# Verification record
+
+## Initial engine release (v0.1)
 
 Verified on 2026-11-16 in Linux with Python 3.12.14 and uv 0.13.6. Dependencies
 were installed from the committed `uv.lock` using the same extras as CI.
@@ -77,3 +79,49 @@ uv run --no-sync python -m build
 
 The README supplies the runnable demo and example commands. Use fresh output
 directories for synthetic examples; they intentionally refuse to overwrite data.
+
+## Next.js console and Ask Q addition
+
+The console and contextual assistant were checked on 2026-11-16 with Node.js
+24.22.1 and Python 3.12.14. CI uses Node.js 22 and Python 3.12. The original engine
+record above remains historical; the expanded local suite reports:
+
+| Check | Observed result |
+| --- | --- |
+| Backend tests | **251 passed**, including 23 console tests and 66 assistant tests |
+| Backend coverage with branch tracking | **75% combined coverage** across the package |
+| Frontend lint and generated-route TypeScript checks | Passed |
+| Frontend unit tests | **11 passed** for session encryption, origin/proxy boundaries and backend response handling |
+| Frontend helper coverage | **95.91% lines** for the configured server-helper scope; this is not total UI coverage |
+| Next.js production build | Passed with the console and Ask Q integrated |
+| Real Next.js → FastAPI HTTP integration | **3 passed**: reviewed migration, session/proxy boundaries, and read-only Ask Q guidance |
+| Video export | Exactly **60.000 seconds**, 1920 × 1080, 30 fps, 1,800 frames, stereo AAC |
+
+The assistant tests exercise role and table/connection scopes, malicious client
+events, plan integrity, no migration writes or checkpoint hydration, model data
+minimization, invalid provider output and timeout fallback. External model
+services were not called. The optional model selects existing grounded help
+sections; these results do not imply unrestricted autonomous reasoning or repair.
+
+Local Chromium could not start because the authoring workspace prohibits its
+UNIX process sockets. The requested execution escalation was automatically
+rejected. The three local HTTP integration cases use real Next.js/FastAPI
+processes and require no browser; they are distinct from visual verification.
+
+The [first console GitHub browser run](https://github.com/mahi80/DataMigration/actions/runs/43831146933)
+passed six of seven scenarios, including actual planner → approver → reconciliation,
+viewer restrictions, rejection, CSRF and HTTP integration. Its mobile overflow
+assertion failed. The table scroll container now establishes a positioned
+containing block for the accessible header label; the expanded browser suite
+also checks Ask Q drag/keyboard movement, context, minimized monitoring and
+reduced motion. The subsequent CI result must confirm these changes.
+
+Container smoke checks and the blocking SonarQube gate remain separate from
+local compilation/tests. A missing SonarQube server/token must still fail CI
+and deployment. Refer to the actual linked workflow result rather than treating
+test coverage or a successful build as a passed SonarQube gate.
+
+The video is a caption-led motion-graphic walkthrough using labeled workflow
+illustrations and the actual SVG mascot. Its source, subtitles and transcript
+are under [video/](video/README.md); it is not a recording of a production
+migration or evidence of a live cloud rollout.
