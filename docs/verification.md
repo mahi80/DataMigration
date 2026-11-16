@@ -50,6 +50,17 @@ No SonarQube server was configured or scanned. Configure it and inspect its actu
 quality-gate result before deployment; the workflows fail when the required gate
 is missing, red or unavailable.
 
+### Initial GitHub CI attempt
+
+After publication, [the initial CI run](https://github.com/mahi80/DataMigration/actions/runs/43826581510)
+checked out the code and set up Python, then failed **Verify SonarQube
+configuration** with `Configure SONAR_HOST_URL as the approved HTTPS SonarQube
+server URL`. Test, image and analysis steps in that run were skipped after the
+preflight failure. The local results above remain separate evidence; they are
+not presented as a successful GitHub CI or SonarQube scan. Set the repository
+variable `SONAR_HOST_URL` and the project-analysis secret `SONAR_TOKEN`, then rerun
+CI. The complete setup is in [CI/CD](cicd.md).
+
 No throughput, monthly-cost, high-availability or customer-scale certification
 is claimed. Use the deployment and platform-selection guides to qualify those
 properties for the actual source/target pair and workload.

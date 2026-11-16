@@ -3,8 +3,10 @@
 The repository includes working GitHub Actions definitions for verification and
 for deploying an API image to an **existing single AWS EC2 host or Azure VM**.
 The deployment jobs do not create cloud resources or run data migrations. No
-workflow, SonarQube scan or live cloud deployment was executed while authoring
-these files; configure the services below and qualify the pipeline in a pilot.
+SonarQube scan or live cloud deployment was executed during local verification.
+The first GitHub CI run reached the required configuration check and stopped
+because `SONAR_HOST_URL` did not identify a valid HTTPS server. Configure the
+services below and qualify the pipeline in a pilot; no quality gate was bypassed.
 
 ## Pipeline and approval boundaries
 
