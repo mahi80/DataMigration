@@ -26,7 +26,7 @@ test("Ask Q moves with pointer and keyboard, guides setup, and persists only its
   const panel = page.getByRole("dialog", { name: "Ask Q assistant", exact: true });
   await expect(panel).toHaveCSS("opacity", "1");
   const panelBounds = (await panel.boundingBox())!;
-  const launcherBounds = (await launcher.boundingBox())!;
+  const launcherBounds = (await page.getByRole("button", { name: "Minimize Ask Q assistant", exact: true }).boundingBox())!;
   expect(panelBounds.x + panelBounds.width <= launcherBounds.x
     || launcherBounds.x + launcherBounds.width <= panelBounds.x
     || panelBounds.y + panelBounds.height <= launcherBounds.y
