@@ -1,7 +1,7 @@
 # DataMigration
 
 <p align="center">
-  <video src="docs/video/datamigration-walkthrough.mp4" width="720" controls muted playsinline></video>
+  <video src="docs/video/datamigration-ui-walkthrough.mp4" width="720" controls muted playsinline></video>
 </p>
 
 A **LangGraph-based migration workbench** for discovering source and target tables,
