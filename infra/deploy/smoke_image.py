@@ -6,6 +6,7 @@ Uses disposable fixtures only. No cloud calls, database URLs or production token
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import os
 import secrets
@@ -15,6 +16,59 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+
+_STARTUP_HTTP_STATUSES = frozenset({408, 425, 429, 500, 502, 503, 504})
+
+
+def read_health(url: str, *, timeout: float = 3) -> dict:
+    """Read an exact HTTP 200 JSON object; invalid responses fail the smoke test."""
+    with urllib.request.urlopen(url, timeout=timeout) as response:
+        if response.status != 200:
+            raise RuntimeError(f"Health endpoint returned unexpected HTTP {response.status}")
+        try:
+            payload = json.load(response)
+        except (ValueError, UnicodeError):
+            raise RuntimeError("Health endpoint did not return valid JSON") from None
+    if not isinstance(payload, dict):
+        raise RuntimeError("Health endpoint did not return a JSON object")
+    return payload
+
+
+def wait_for_health(url: str, *, timeout_seconds: float = 60, interval_seconds: float = 1) -> dict:
+    """Tolerate bounded startup races, without hiding bad health responses.
+
+    Docker can publish a port before the application accepts requests. In that
+    interval urllib may raise a raw ConnectionResetError or IncompleteRead, not
+    only URLError. Diagnostics deliberately contain no response/error text.
+    """
+    if timeout_seconds <= 0 or interval_seconds <= 0:
+        raise ValueError("Health wait and interval must be positive")
+    deadline = time.monotonic() + timeout_seconds
+    last_failure = "no successful probe"
+    while (remaining := deadline - time.monotonic()) > 0:
+        try:
+            payload = read_health(url, timeout=min(3, remaining))
+        except urllib.error.HTTPError as error:
+            if error.code not in _STARTUP_HTTP_STATUSES:
+                raise RuntimeError(f"Health endpoint returned unexpected HTTP {error.code}") from None
+            last_failure = f"HTTP {error.code}"
+        except (urllib.error.URLError, ConnectionError, TimeoutError,
+                http.client.RemoteDisconnected, http.client.IncompleteRead) as error:
+            last_failure = type(error).__name__
+        else:
+            if payload.get("status") == "ok":
+                if time.monotonic() <= deadline:
+                    return payload
+                last_failure = "ready response arrived after deadline"
+            else:
+                last_failure = "HTTP 200 without status=ok"
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(interval_seconds, remaining))
+    raise RuntimeError(
+        f"Health endpoint did not become ready within {timeout_seconds:g}s ({last_failure})"
+    )
 
 
 def command(*args: str, check: bool = True) -> str:
@@ -54,20 +108,9 @@ def main() -> None:
             origin = "http://127.0.0.1:" + port
 
             def health() -> dict:
-                with urllib.request.urlopen(origin + "/health", timeout=3) as response:
-                    return json.load(response)
+                return read_health(origin + "/health")
 
-            deadline = time.monotonic() + 60
-            while True:
-                try:
-                    initial = health()
-                    if initial.get("status") == "ok":
-                        break
-                except (urllib.error.URLError, TimeoutError):
-                    pass
-                if time.monotonic() > deadline:
-                    raise RuntimeError("Container did not become healthy")
-                time.sleep(1)
+            initial = wait_for_health(origin + "/health")
             if initial.get("active_runs") != 0 or initial.get("draining") is not False:
                 raise RuntimeError("Initial maintenance state is invalid")
             try:

@@ -63,7 +63,9 @@ application code, infer business joins or translate stored procedures.
 Open a migration and select **Start** in **Monitor this run**. Q performs
 read-only status checks every **8 seconds**. Monitoring continues when the Q
 panel is minimized; a watch indicator remains on the character, and a status
-change adds a badge and conversation notice.
+change adds a badge and conversation notice. A detected change also refreshes
+the selected migration and workspace summary from the authorized API, so a run
+approved in another session no longer leaves stale approval controls on screen.
 
 Checks pause while the browser tab is hidden. They stop when you select **Stop**,
 change the selected run or signed-in identity, sign out/close the workspace, reach

@@ -88,10 +88,10 @@ record above remains historical; the expanded local suite reports:
 
 | Check | Observed result |
 | --- | --- |
-| Backend tests | **251 passed**, including 23 console tests and 66 assistant tests |
+| Backend and deployment-probe tests | **269 passed**, including 23 console tests, 68 assistant tests and 16 startup-probe regressions |
 | Backend coverage with branch tracking | **75% combined coverage** across the package |
 | Frontend lint and generated-route TypeScript checks | Passed |
-| Frontend unit tests | **11 passed** for session encryption, origin/proxy boundaries and backend response handling |
+| Frontend unit tests | **16 passed** for session encryption, origin/proxy boundaries, backend response handling and draggable-panel geometry |
 | Frontend helper coverage | **95.91% lines** for the configured server-helper scope; this is not total UI coverage |
 | Next.js production build | Passed with the console and Ask Q integrated |
 | Real Next.js → FastAPI HTTP integration | **3 passed**: reviewed migration, session/proxy boundaries, and read-only Ask Q guidance |
@@ -114,7 +114,14 @@ viewer restrictions, rejection, CSRF and HTTP integration. Its mobile overflow
 assertion failed. The table scroll container now establishes a positioned
 containing block for the accessible header label; the expanded browser suite
 also checks Ask Q drag/keyboard movement, context, minimized monitoring and
-reduced motion. The subsequent CI result must confirm these changes.
+reduced motion. The [Ask Q GitHub run](https://github.com/mahi80/DataMigration/actions/runs/43832319555)
+passed **all 11 browser and HTTP scenarios**, including the corrected mobile
+layout. Its API container image built successfully, but the startup probe failed
+on a connection reset before the server was ready. The API and frontend probes
+now share a bounded readiness helper that retries transient transport errors
+while preserving exact HTTP/status checks and the deadline. Sixteen regression
+cases cover that change. Final container and browser results are recorded below
+when observed; image build success alone is not a passing smoke check.
 
 Container smoke checks and the blocking SonarQube gate remain separate from
 local compilation/tests. A missing SonarQube server/token must still fail CI

@@ -24,6 +24,13 @@ test("Ask Q moves with pointer and keyboard, guides setup, and persists only its
   await expect.poll(async () => (await launcher.boundingBox())!.x).toBeLessThan(from.x - 50);
   await launcher.click();
   const panel = page.getByRole("dialog", { name: "Ask Q assistant", exact: true });
+  await expect(panel).toHaveCSS("opacity", "1");
+  const panelBounds = (await panel.boundingBox())!;
+  const launcherBounds = (await launcher.boundingBox())!;
+  expect(panelBounds.x + panelBounds.width <= launcherBounds.x
+    || launcherBounds.x + launcherBounds.width <= panelBounds.x
+    || panelBounds.y + panelBounds.height <= launcherBounds.y
+    || launcherBounds.y + launcherBounds.height <= panelBounds.y).toBe(true);
   await panel.getByRole("button", { name: "Guide my setup", exact: true }).click();
   await expect(panel.getByRole("log")).toContainText("Set up a reviewed migration");
   await expect(panel.getByRole("log")).toContainText("MIGRATION_CONNECTIONS");
@@ -31,7 +38,7 @@ test("Ask Q moves with pointer and keyboard, guides setup, and persists only its
   const persisted = await page.evaluate(() => ({ ...localStorage }));
   expect(Object.keys(persisted)).toEqual(["datamigration.ask-q.position.v1"]);
   expect(Object.keys(JSON.parse(persisted["datamigration.ask-q.position.v1"]))).toEqual(["x", "y"]);
-  await page.screenshot({ path: testInfo.outputPath("ask-q-context-desktop.png"), fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath("ask-q-context-desktop.png"), fullPage: true, animations: "disabled" });
   await panel.getByRole("button", { name: "Clear Ask Q conversation" }).click();
   await expect(panel.getByRole("log")).not.toContainText("Guide me through setting up a new migration");
 });
@@ -66,10 +73,13 @@ test("Ask Q watches an authorized run while minimized and asks for review before
   });
   expect(approved.status()).toBe(200);
   await expect(page.getByLabel("Run status changed", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Migration validated.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ready for a careful review" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Approve and run", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Open Ask Q assistant", exact: true }).click();
   await expect(panel.getByRole("log")).toContainText("changed from awaiting approval to completed");
   await expect(panel.getByText("Run finished", { exact: true })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath("ask-q-monitor-desktop.png"), fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath("ask-q-monitor-desktop.png"), fullPage: true, animations: "disabled" });
 });
 
 test("Ask Q stays inside a mobile viewport and respects reduced motion", async ({ page }) => {

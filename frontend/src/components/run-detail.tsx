@@ -8,7 +8,7 @@ import { DatabaseGlyph, EmptyState, Lifecycle, Loading, Metric, Notice, StatusBa
 import { recordInteraction } from "./assistant-events";
 import type { RunFocus } from "./ask-q";
 
-export function RunDetailView({ id, principal, summary, focusRequest, onBack, onUpdated }: { id: string; principal: Principal; summary?: RunSummary; focusRequest?: { section: RunFocus; nonce: number }; onBack: () => void; onUpdated: () => void }) {
+export function RunDetailView({ id, principal, summary, focusRequest, refreshNonce = 0, onBack, onUpdated }: { id: string; principal: Principal; summary?: RunSummary; focusRequest?: { section: RunFocus; nonce: number }; refreshNonce?: number; onBack: () => void; onUpdated: () => void }) {
   const [run, setRun] = useState<RunDetailValue | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [error, setError] = useState("");
@@ -23,26 +23,34 @@ export function RunDetailView({ id, principal, summary, focusRequest, onBack, on
   const reviewPanel = useRef<HTMLElement>(null);
   const recoveryPanel = useRef<HTMLDivElement>(null);
   const appliedFocus = useRef<number | undefined>(undefined);
+  const readSequence = useRef(0);
   const canReadPlan = principal.actions.includes("read_plan");
   const canApprove = principal.actions.includes("approve");
   const canRetry = principal.actions.includes("retry");
 
   const refresh = useCallback(async () => {
+    const sequence = ++readSequence.current;
     try {
       const next = await api<RunDetailValue>(`runs/${encodeURIComponent(id)}`);
+      if (sequence !== readSequence.current) return;
       setRun(next); setError("");
+      if (next.status !== "AWAITING_APPROVAL") setReviewed(false);
+      setConfirmation((current) => {
+        if (current === "retry") return ["FAILED", "CREATED"].includes(next.status) ? current : null;
+        return next.status === "AWAITING_APPROVAL" ? current : null;
+      });
       if (canReadPlan && next.plan_hash) {
-        try { const nextPlan = await api<Plan>(`runs/${encodeURIComponent(id)}/plan`); setPlan(nextPlan); setPlanError(""); }
-        catch (failure) { setPlanError(errorMessage(failure)); }
+        try { const nextPlan = await api<Plan>(`runs/${encodeURIComponent(id)}/plan`); if (sequence === readSequence.current) { setPlan(nextPlan); setPlanError(""); } }
+        catch (failure) { if (sequence === readSequence.current) setPlanError(errorMessage(failure)); }
       }
-    } catch (failure) { setError(errorMessage(failure)); }
-    finally { setLoading(false); }
+    } catch (failure) { if (sequence === readSequence.current) setError(errorMessage(failure)); }
+    finally { if (sequence === readSequence.current) setLoading(false); }
   }, [id, canReadPlan]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void refresh(), 0);
-    return () => window.clearTimeout(timer);
-  }, [refresh]);
+    return () => { window.clearTimeout(timer); readSequence.current += 1; };
+  }, [refresh, refreshNonce]);
   const status = run?.status;
   useEffect(() => {
     if (!status || !["RUNNING", "CREATED"].includes(status)) return;

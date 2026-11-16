@@ -35,7 +35,7 @@
 @keyframes q-smile { 0%, 20%, 50%, 100% { transform: scaleX(1); } 35% { transform: scaleX(1.15) scaleY(1.12); } }
 @keyframes q-glow { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }
 @keyframes q-sparkle { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
-.ask-q-panel { position: fixed; z-index: 64; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #cddfd4; border-radius: 18px; background: #fff; box-shadow: 0 16px 80px #19452c26, 0 4px 18px #19452c12; color: var(--q-ink); animation: q-panel-in .18s ease-out; }
+.ask-q-panel { position: fixed; z-index: 66; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #cddfd4; border-radius: 18px; background: #fff; box-shadow: 0 16px 80px #19452c26, 0 4px 18px #19452c12; color: var(--q-ink); animation: q-panel-in .18s ease-out; }
 .ask-q-panel[hidden] { display: none; }
 .ask-q-watch-badge { position: absolute; z-index: 3; top: 21px; right: 10px; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: #eaf8ee; border: 2px solid white; box-shadow: 0 2px 7px #1b634c26; color: #a77320; font-size: 11px; font-weight: 750; }
 .ask-q-watch-badge > span { width: 6px; height: 6px; border-radius: 50%; background: #22a37a; }

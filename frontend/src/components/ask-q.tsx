@@ -6,6 +6,8 @@ import type { FormEvent, KeyboardEvent, PointerEvent } from "react";
 import { ASSISTANT_EVENT } from "./assistant-events";
 import type { AssistantInteraction } from "./assistant-events";
 import { AskQMascot } from "./ask-q-mascot";
+import { ASK_Q_LAUNCHER_SIZE as launcherSize, placeAskQPanel } from "./ask-q-placement";
+import type { AskQPoint as Point, AskQViewport as Viewport } from "./ask-q-placement";
 import { api, errorMessage } from "./types";
 import type { Principal, RunDetail } from "./types";
 import { StatusBadge } from "./ui";
@@ -39,11 +41,7 @@ interface Message {
   sources?: AssistantResponse["sources"];
   view?: AssistantView;
 }
-interface Point { x: number; y: number }
-interface Viewport { width: number; height: number }
-
 const POSITION_KEY = "datamigration.ask-q.position.v1";
-const launcherSize = { width: 104, height: 126 };
 const views: AssistantView[] = ["overview", "migrations", "connections", "new", "run"];
 const viewNames: Record<AssistantView, string> = { overview: "Workspace overview", migrations: "Migration history", connections: "Connections", new: "Migration setup", run: "Selected migration" };
 const quickPrompts = [
@@ -64,11 +62,12 @@ function sourceHref(path: string): string | undefined {
   return /^(?:docs\/|README\.md$)[a-zA-Z0-9_./#-]*$/.test(path) && !path.includes("..") ? `https://github.com/mahi80/DataMigration/blob/main/${path}` : undefined;
 }
 
-export function AskQ({ principal, view, runId, onNavigate }: {
+export function AskQ({ principal, view, runId, onNavigate, onRunStatusChange }: {
   principal: Principal;
   view: AssistantView;
   runId?: string | null;
   onNavigate: (view: AssistantView, runId?: string, focus?: RunFocus) => void;
+  onRunStatusChange: (runId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [point, setPoint] = useState<Point | null>(null);
@@ -221,19 +220,18 @@ export function AskQ({ principal, view, runId, onNavigate }: {
   const notifyStatus = useCallback((previous: string, current: string) => {
     setMessages((messages) => [...messages, { id: crypto.randomUUID(), role: "status", text: `The selected run changed from ${statusName(previous)} to ${statusName(current)}.` } satisfies Message].slice(-40));
     if (!open) setStatusUpdateRun(runId || null);
-  }, [open, runId]);
+    if (runId) onRunStatusChange(runId);
+  }, [open, runId, onRunStatusChange]);
   const monitorChanged = useCallback((id: string | null | undefined, enabled: boolean) => setMonitoring({ runId: id, enabled }), []);
 
-  const panelWidth = Math.min(400, viewport.width - 24);
-  const panelHeight = Math.min(650, Math.max(220, viewport.height - 166), viewport.height - 24);
   const anchor = point || { x: viewport.width - launcherSize.width - 24, y: viewport.height - launcherSize.height - 18 };
-  const panelPosition = { left: Math.max(12, Math.min(anchor.x + launcherSize.width - panelWidth, viewport.width - panelWidth - 12)), top: Math.max(12, Math.min(anchor.y - panelHeight - 8, viewport.height - panelHeight - 12)), width: panelWidth, height: panelHeight };
+  const panel = placeAskQPanel(anchor, viewport);
 
   return <div className="ask-q-root">
     <p id="ask-q-move-help" className="sr-only">Drag Ask Q to move. With the button focused, use arrow keys to move, Shift for larger steps, Home to reset, or Enter to open.</p>
     <span className="sr-only" role="status">{positionAnnouncement}</span>
     <span className="sr-only" role="status">{hasStatusUpdate && !open ? "The monitored run changed status. Open Ask Q to review the update." : ""}</span>
-    <section className="ask-q-panel" hidden={!open} style={panelPosition} role="dialog" aria-label="Ask Q assistant" onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); closePanel(); } }}>
+    <section className="ask-q-panel" hidden={!open} style={panel.style} data-placement={panel.placement} role="dialog" aria-label="Ask Q assistant" onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); closePanel(); } }}>
       <header className="ask-q-header"><div className="ask-q-header-avatar"><AskQMascot thinking={busy} /></div><div className="ask-q-title"><h2>Ask Q<span className="ask-q-online-dot" /></h2><span>Your migration companion</span></div><button className="icon-button" aria-label="Clear Ask Q conversation" title="Clear conversation" onClick={clearConversation}><Trash2 size={15} /></button><button className="icon-button" aria-label="Close Ask Q" onClick={closePanel}><X size={19} /></button></header>
       <div className="ask-q-context"><button onClick={() => setContextOpen(!contextOpen)} aria-expanded={contextOpen}><span><span className="ask-q-context-dot" />{viewNames[view]}</span><ChevronDown size={13} className={contextOpen ? "flipped" : ""} /></button><span className="ask-q-mode">{mode === "model" ? <Sparkles size={11} /> : <GitBranchIcon />}{mode === "model" ? "Model assisted" : "Guided mode"}</span></div>
       {contextOpen && <div className="ask-q-context-details"><strong>Context you control</strong><p>Q receives the current screen name, your role, the selected run reference, and up to eight recent action names. Current buffer: {contextCount}.</p><p>Form values, credentials, raw rows, and page content are excluded. Your question goes to the workspace assistant service. Conversation history stays in memory; only Q’s position is saved in browser storage.</p></div>}

@@ -431,6 +431,16 @@ def test_generic_next_step_uses_only_event_hint_and_keeps_authoritative_state(
     "question,evidence,path",
     [
         ("Which source and target connectors support Redis?", "hashes/prefixes", "docs/connectors.md"),
+        (
+            "Which databases and file formats can this tool migrate, and how should I choose a destination?",
+            "hashes/prefixes",
+            "docs/connectors.md",
+        ),
+        (
+            "Help me understand migration issues and propose safe next steps for review.",
+            "No run is selected",
+            "docs/frontend.md",
+        ),
         ("Can OLTP become a star schema with seven tables?", "SCD history", "docs/data-models.md"),
         ("Can you translate stored procedures and nested queries?", "does not execute", "docs/connectors.md"),
         ("Explain AWS Glue crawler and Step Functions", "uncertain submissions", "docs/architecture/aws.md"),

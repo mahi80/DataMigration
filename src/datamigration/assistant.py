@@ -381,7 +381,7 @@ _TOPICS = (
     ("approval", r"\b(approv\w*|reject|permission|role|rbac|access|authoriz\w*)\b"),
     (
         "connections",
-        r"\b(connect\w*|database|postgres\w*|redis|cassandra|mongo\w*|redshift|flat files?|csv|parquet|orm)\b",
+        r"\b(connect\w*|databases?|postgres\w*|redis|cassandra|mongo\w*|redshift|flat files?|csv|parquet|orm)\b",
     ),
     (
         "setup",
@@ -394,7 +394,7 @@ _TOPICS = (
 def _topics(message: str, view: View, interactions: list[Interaction]) -> list[str]:
     text = message.casefold()
     matched = [name for name, pattern in _TOPICS if re.search(pattern, text)]
-    if re.search(r"\b(status|progress|running|failed|failure|error|retry|stuck|issue|complete)\b", text):
+    if re.search(r"\b(status|progress|running|failed|failure|error|retry|stuck|issues?|complete)\b", text):
         matched.insert(0, "status")
     # Browser events guide generic help only. They never prove a completed
     # operation, add a run ID, or alter authorization/status/action eligibility.

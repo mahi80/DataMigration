@@ -119,23 +119,14 @@ jobs:
           CONSOLE_TEST_PORT="$(docker port "$console_name" 3000/tcp)"
           export CONSOLE_TEST_PORT
           python - <<'PY'
-          import json, os, time, urllib.error, urllib.request
+          import os
+          from infra.deploy.smoke_image import wait_for_health
           port = os.environ['CONSOLE_TEST_PORT'].splitlines()[0].rsplit(':', 1)[1]
           if not port.isdecimal():
               raise SystemExit('Unexpected frontend container port')
           origin = 'http://127.0.0.1:' + port
-          deadline = time.monotonic() + 60
-          while time.monotonic() < deadline:
-              try:
-                  with urllib.request.urlopen(origin + '/api/health', timeout=3) as response:
-                      if response.status == 200 and json.load(response).get('status') == 'ok':
-                          print('Frontend process and configuration health passed; backend readiness is checked separately')
-                          break
-              except (urllib.error.URLError, TimeoutError):
-                  pass
-              time.sleep(1)
-          else:
-              raise SystemExit('Frontend image did not become healthy')
+          wait_for_health(origin + '/api/health')
+          print('Frontend process and configuration health passed; backend readiness is checked separately')
           PY
       - name: Verify SonarQube configuration
         if: inputs.run_sonar
