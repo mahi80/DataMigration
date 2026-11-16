@@ -1,0 +1,38 @@
+[
+  {
+    "name": "migration_0109707f03893d45_source_0",
+    "properties": {
+      "type": "SqlServerTable",
+      "linkedServiceName": {
+        "referenceName": "ApprovedSourceSql",
+        "type": "LinkedServiceReference"
+      },
+      "typeProperties": {
+        "schema": "dbo",
+        "table": "customers"
+      },
+      "annotations": [
+        "migration-workbench",
+        "review-before-deployment"
+      ]
+    }
+  },
+  {
+    "name": "migration_0109707f03893d45_target_0",
+    "properties": {
+      "type": "AzureSqlTable",
+      "linkedServiceName": {
+        "referenceName": "ApprovedTargetAzureSql",
+        "type": "LinkedServiceReference"
+      },
+      "typeProperties": {
+        "schema": "dbo",
+        "table": "customers"
+      },
+      "annotations": [
+        "migration-workbench",
+        "review-before-deployment"
+      ]
+    }
+  }
+]

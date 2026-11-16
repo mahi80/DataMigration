@@ -1,0 +1,27 @@
+{
+  "name": "commerce_semantic_projection",
+  "source": {"kind": "postgresql", "url_env": "SOURCE_DATABASE_URL"},
+  "target": {"kind": "postgresql", "url_env": "TARGET_DATABASE_URL"},
+  "tables": [
+    {
+      "source": "customer",
+      "target": "public.dim_customer",
+      "keys": ["customer_id"],
+      "columns": [
+        {"source": "id", "target": "customer_id", "data_type": "integer", "nullable": false, "transform": "identity"},
+        {"source": "name", "target": "customer_name", "data_type": "string", "nullable": false, "transform": "trim"}
+      ]
+    },
+    {
+      "source": "orders",
+      "target": "public.fact_order",
+      "keys": ["order_id"],
+      "depends_on": ["public.dim_customer"],
+      "columns": [
+        {"source": "id", "target": "order_id", "data_type": "integer", "nullable": false, "transform": "identity"},
+        {"source": "customer_id", "target": "customer_id", "data_type": "integer", "nullable": false, "transform": "identity"},
+        {"source": "amount", "target": "net_amount", "data_type": "decimal", "nullable": false, "transform": "identity"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "job_id": 12345,
+  "required_job_parameters": [
+    "migration_manifest_uri",
+    "migration_operation_id",
+    "migration_plan_hash"
+  ],
+  "target_catalog": "migration_demo",
+  "target_schema": "silver"
+}

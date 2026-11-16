@@ -1,0 +1,29 @@
+spec_version: 1
+name: customer-snapshot-to-delta
+source:
+  kind: postgresql
+  url_env: SOURCE_DATABASE_URL
+target:
+  kind: delta
+  url_env: TARGET_DELTA_ROOT
+workload: lakehouse
+mode: snapshot
+policy:
+  source_quiesced: true
+  batch_size: 1000
+  max_rows_per_table: 100000
+tables:
+  - source: public.customers
+    target: customers
+    keys: [customer_id]
+    columns:
+      - {source: id, target: customer_id, data_type: integer, nullable: false}
+      - {source: name, target: customer_name, data_type: string, transform: trim, nullable: false}
+      - {source: email, target: email, data_type: string, nullable: false}
+    quality_rules:
+      - name: email-format
+        column: email
+        check: regex
+        pattern: '[^@\s]+@[^@\s]+\.[^@\s]+'
+        correction: lower
+      - {name: unique-email, column: email, check: unique}

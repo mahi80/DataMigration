@@ -1,0 +1,95 @@
+name: Deploy AWS pilot
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-aws-pilot
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/quality.yml
+    with:
+      run_sonar: true
+      sonar_host_url: ${{ vars.SONAR_HOST_URL }}
+    secrets: inherit
+  image:
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      IMAGE_REPOSITORY: ${{ vars.AWS_ECR_REPOSITORY }}
+      SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Obtain temporary image-publisher credentials
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_BUILD_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Build, smoke test and publish one immutable image
+        id: publish
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os,re
+          value=os.environ['IMAGE_REPOSITORY']
+          if not re.fullmatch(r'[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(?:\.cn)?/[a-z0-9][a-z0-9/_-]*',value):
+              raise SystemExit('Configure AWS_ECR_REPOSITORY with the full existing ECR repository URI')
+          PY
+          image_tag="$IMAGE_REPOSITORY:$SOURCE_SHA"
+          registry="${IMAGE_REPOSITORY%%/*}"
+          docker build --tag "$image_tag" .
+          python infra/deploy/smoke_image.py "$image_tag"
+          aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$registry" >/dev/null
+          docker push "$image_tag"
+          immutable_image="$(docker image inspect --format '{{index .RepoDigests 0}}' "$image_tag")"
+          echo "image=$immutable_image" >> "$GITHUB_OUTPUT"
+          printf '### AWS image ready for approval\n\n`%s`\n' "$immutable_image" >> "$GITHUB_STEP_SUMMARY"
+      - name: Clear registry credentials
+        if: always()
+        run: docker logout "${IMAGE_REPOSITORY%%/*}" >/dev/null 2>&1 || true
+  deploy:
+    needs: [quality, image]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: aws-pilot
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: '3.12'
+      - name: Obtain temporary deployment credentials after approval
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Install the frozen AWS adapter dependencies
+        run: |
+          python -m pip install 'uv==0.13.6'
+          uv sync --frozen --extra aws
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+      - name: Drain and deploy the approved digest to the managed host
+        env:
+          APPROVED_IMAGE: ${{ needs.image.outputs.image }}
+          INSTANCE_ID: ${{ vars.AWS_INSTANCE_ID }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: python infra/deploy/aws_ssm.py --instance-id "$INSTANCE_ID" --region "$AWS_REGION" --image "$APPROVED_IMAGE"

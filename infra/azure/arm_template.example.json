@@ -1,0 +1,145 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "factoryName": {
+      "type": "string",
+      "defaultValue": "REPLACE-FACTORY-NAME"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.DataFactory/factories/datasets",
+      "apiVersion": "2018-06-01",
+      "name": "[concat(parameters('factoryName'), '/migration_0109707f03893d45_source_0')]",
+      "properties": {
+        "type": "SqlServerTable",
+        "linkedServiceName": {
+          "referenceName": "ApprovedSourceSql",
+          "type": "LinkedServiceReference"
+        },
+        "typeProperties": {
+          "schema": "dbo",
+          "table": "customers"
+        },
+        "annotations": [
+          "migration-workbench",
+          "review-before-deployment"
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/datasets",
+      "apiVersion": "2018-06-01",
+      "name": "[concat(parameters('factoryName'), '/migration_0109707f03893d45_target_0')]",
+      "properties": {
+        "type": "AzureSqlTable",
+        "linkedServiceName": {
+          "referenceName": "ApprovedTargetAzureSql",
+          "type": "LinkedServiceReference"
+        },
+        "typeProperties": {
+          "schema": "dbo",
+          "table": "customers"
+        },
+        "annotations": [
+          "migration-workbench",
+          "review-before-deployment"
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/pipelines",
+      "apiVersion": "2018-06-01",
+      "name": "[concat(parameters('factoryName'), '/migration_customers_v1')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories/datasets', parameters('factoryName'), 'migration_0109707f03893d45_source_0')]",
+        "[resourceId('Microsoft.DataFactory/factories/datasets', parameters('factoryName'), 'migration_0109707f03893d45_target_0')]"
+      ],
+      "properties": {
+        "activities": [
+          {
+            "name": "Copy_0_customers",
+            "type": "Copy",
+            "dependsOn": [],
+            "policy": {
+              "timeout": "0.12:00:00",
+              "retry": 0,
+              "retryIntervalInSeconds": 30,
+              "secureOutput": true,
+              "secureInput": true
+            },
+            "inputs": [
+              {
+                "referenceName": "migration_0109707f03893d45_source_0",
+                "type": "DatasetReference"
+              }
+            ],
+            "outputs": [
+              {
+                "referenceName": "migration_0109707f03893d45_target_0",
+                "type": "DatasetReference"
+              }
+            ],
+            "typeProperties": {
+              "source": {
+                "type": "SqlSource"
+              },
+              "sink": {
+                "type": "AzureSqlSink",
+                "writeBehavior": "upsert",
+                "upsertSettings": {
+                  "useTempDB": true,
+                  "keys": [
+                    "customer_id"
+                  ]
+                }
+              },
+              "translator": {
+                "type": "TabularTranslator",
+                "mappings": [
+                  {
+                    "source": {
+                      "name": "customer_id"
+                    },
+                    "sink": {
+                      "name": "customer_id"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "customer_name"
+                    },
+                    "sink": {
+                      "name": "customer_name"
+                    }
+                  }
+                ],
+                "typeConversion": true,
+                "typeConversionSettings": {
+                  "allowDataTruncation": false,
+                  "treatBooleanAsNumber": false
+                }
+              },
+              "enableSkipIncompatibleRow": false
+            }
+          }
+        ],
+        "concurrency": 1,
+        "parameters": {
+          "migration_operation_id": {
+            "type": "String"
+          },
+          "migration_plan_hash": {
+            "type": "String"
+          }
+        },
+        "annotations": [
+          "migration-workbench",
+          "snapshot-upsert",
+          "requires-reconciliation"
+        ]
+      }
+    }
+  ]
+}

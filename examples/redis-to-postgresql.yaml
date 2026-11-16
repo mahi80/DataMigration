@@ -1,0 +1,18 @@
+spec_version: 1
+name: redis-hash-envelope
+source:
+  kind: redis
+  url_env: SOURCE_REDIS_URL
+  options: {pattern: 'migration:customers:*'}
+target: {kind: postgresql, url_env: TARGET_DATABASE_URL}
+workload: key_value
+mode: snapshot
+policy: {source_quiesced: true, batch_size: 500}
+tables:
+  - source: hashes
+    target: redis_hash_snapshot
+    keys: [redis_key]
+    columns:
+      - {source: _key, target: redis_key, data_type: string, nullable: false}
+      - {source: payload, target: payload, data_type: json, nullable: false}
+      - {source: _expires_at_ms, target: expires_at_ms, data_type: integer, nullable: false}

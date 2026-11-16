@@ -1,0 +1,90 @@
+name: Deploy Azure pilot
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-azure-pilot
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/quality.yml
+    with:
+      run_sonar: true
+      sonar_host_url: ${{ vars.SONAR_HOST_URL }}
+    secrets: inherit
+  image:
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+    env:
+      ACR_NAME: ${{ vars.AZURE_ACR_NAME }}
+      IMAGE_REPOSITORY_NAME: ${{ vars.AZURE_IMAGE_REPOSITORY }}
+      SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Obtain temporary image-publisher credentials
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3
+        with:
+          client-id: ${{ vars.AZURE_BUILD_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Build, smoke test and publish one immutable image
+        id: publish
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os,re
+          if not re.fullmatch(r'[a-z0-9]{5,50}',os.environ['ACR_NAME']):
+              raise SystemExit('Configure AZURE_ACR_NAME with the existing registry name')
+          if not re.fullmatch(r'[a-z0-9][a-z0-9/_-]*',os.environ['IMAGE_REPOSITORY_NAME']):
+              raise SystemExit('Configure AZURE_IMAGE_REPOSITORY with a repository name')
+          PY
+          image_tag="$ACR_NAME.azurecr.io/$IMAGE_REPOSITORY_NAME:$SOURCE_SHA"
+          docker build --tag "$image_tag" .
+          python infra/deploy/smoke_image.py "$image_tag"
+          az acr login --name "$ACR_NAME" --output none
+          docker push "$image_tag"
+          immutable_image="$(docker image inspect --format '{{index .RepoDigests 0}}' "$image_tag")"
+          echo "image=$immutable_image" >> "$GITHUB_OUTPUT"
+          printf '### Azure image ready for approval\n\n`%s`\n' "$immutable_image" >> "$GITHUB_STEP_SUMMARY"
+      - name: Clear registry credentials
+        if: always()
+        run: docker logout "$ACR_NAME.azurecr.io" >/dev/null 2>&1 || true
+  deploy:
+    needs: [quality, image]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: azure-pilot
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Obtain temporary deployment credentials after approval
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3
+        with:
+          client-id: ${{ vars.AZURE_DEPLOY_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Drain and deploy the approved digest to the managed host
+        env:
+          APPROVED_IMAGE: ${{ needs.image.outputs.image }}
+          RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          VM_NAME: ${{ vars.AZURE_VM_NAME }}
+          ACR_NAME: ${{ vars.AZURE_ACR_NAME }}
+        run: python infra/deploy/azure_vm.py --resource-group "$RESOURCE_GROUP" --vm-name "$VM_NAME" --acr-name "$ACR_NAME" --image "$APPROVED_IMAGE"

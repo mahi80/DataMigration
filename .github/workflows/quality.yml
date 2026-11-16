@@ -1,0 +1,94 @@
+name: Reusable quality gate
+
+on:
+  workflow_call:
+    inputs:
+      run_sonar:
+        type: boolean
+        default: true
+      sonar_host_url:
+        type: string
+        default: ''
+    secrets:
+      SONAR_TOKEN:
+        required: false
+      SONAR_ROOT_CERT:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Tests, image and SonarQube gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Verify SonarQube configuration
+        if: inputs.run_sonar
+        env:
+          SONAR_HOST_URL: ${{ inputs.sonar_host_url }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          python - <<'PY'
+          import os
+          from urllib.parse import urlparse
+          url = urlparse(os.environ.get('SONAR_HOST_URL', ''))
+          if url.scheme != 'https' or not url.hostname or url.username or url.password:
+              raise SystemExit('Configure SONAR_HOST_URL as the approved HTTPS SonarQube server URL')
+          if not os.environ.get('SONAR_TOKEN'):
+              raise SystemExit('Configure the SONAR_TOKEN project-analysis secret; the gate cannot be skipped')
+          PY
+      - name: Install the frozen dependency set
+        run: |
+          python -m pip install 'uv==0.13.6'
+          uv sync --frozen --extra dev --extra aws --extra azure --extra databricks
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+      - name: Lint and validate script syntax
+        run: |
+          ruff check .
+          bash -n infra/deploy/deploy_host.sh
+          python -m compileall -q src infra examples
+      - name: Run unit and contract tests with branch coverage
+        run: |
+          pytest --cov=datamigration --cov-config=infra/coverage.ini --cov-report=term-missing --cov-report=xml:coverage.xml --junitxml=reports/junit.xml
+      - name: Build wheel and source distribution
+        run: python -m build
+      - name: Build and exercise API image
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          docker build --tag "datamigration-ci:$SOURCE_SHA" .
+          python infra/deploy/smoke_image.py "datamigration-ci:$SOURCE_SHA"
+      - name: Analyze and wait for the SonarQube quality gate
+        if: inputs.run_sonar
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ inputs.sonar_host_url }}
+          SONAR_ROOT_CERT: ${{ secrets.SONAR_ROOT_CERT }}
+        with:
+          args: >-
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=600
+      - name: Preserve test reports and package artifacts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: verification-reports
+          path: |
+            coverage.xml
+            reports/junit.xml
+            dist/
+          if-no-files-found: ignore
+          retention-days: 7

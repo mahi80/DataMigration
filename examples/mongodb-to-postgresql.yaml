@@ -1,0 +1,14 @@
+spec_version: 1
+name: lossless-document-envelope
+source: {kind: mongodb, url_env: SOURCE_MONGODB_URL}
+target: {kind: postgresql, url_env: TARGET_DATABASE_URL}
+workload: document
+mode: snapshot
+policy: {source_quiesced: true, batch_size: 500}
+tables:
+  - source: customers
+    target: customer_documents
+    keys: [document_id]
+    columns:
+      - {source: _id, target: document_id, data_type: string, nullable: false}
+      - {source: document, target: document_ejson, data_type: string, nullable: false}

@@ -1,0 +1,21 @@
+{
+  "Comment": "Execute an approved manifest with an existing Glue job; reconcile separately.",
+  "StartAt": "RunApprovedGlueJob",
+  "TimeoutSeconds": 86400,
+  "States": {
+    "RunApprovedGlueJob": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": {
+        "JobName": "migration-approved-worker",
+        "Arguments": {
+          "--migration-manifest.$": "$.manifest_uri",
+          "--migration-plan-hash.$": "$.plan_hash",
+          "--migration-operation-id.$": "$.operation_id"
+        }
+      },
+      "ResultPath": "$.job",
+      "End": true
+    }
+  }
+}

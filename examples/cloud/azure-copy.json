@@ -1,0 +1,53 @@
+{
+  "spec_version": 1,
+  "name": "customers-snapshot",
+  "mode": "snapshot",
+  "workload": "oltp",
+  "source": {
+    "kind": "sqlserver",
+    "url_env": "SOURCE_URL"
+  },
+  "target": {
+    "kind": "azure_sql",
+    "url_env": "TARGET_URL"
+  },
+  "policy": {
+    "source_quiesced": true,
+    "batch_size": 500,
+    "max_rows_per_table": 100000,
+    "target_scope": "entire_table",
+    "allow_create_tables": false
+  },
+  "tables": [
+    {
+      "source": "dbo.customers",
+      "target": "dbo.customers",
+      "keys": [
+        "customer_id"
+      ],
+      "columns": [
+        {
+          "source": "customer_id",
+          "target": "customer_id",
+          "data_type": "integer",
+          "nullable": false
+        },
+        {
+          "source": "customer_name",
+          "target": "customer_name",
+          "data_type": "string",
+          "nullable": true
+        }
+      ]
+    }
+  ],
+  "cloud": {
+    "provider": "azure",
+    "subscription_id": "REPLACE-SUBSCRIPTION-ID",
+    "resource_group": "migration-rg",
+    "factory_name": "REPLACE-FACTORY-NAME",
+    "pipeline_name": "migration_customers_v1",
+    "source_linked_service": "ApprovedSourceSql",
+    "target_linked_service": "ApprovedTargetAzureSql"
+  }
+}

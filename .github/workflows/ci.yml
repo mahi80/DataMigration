@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    uses: ./.github/workflows/quality.yml
+    with:
+      # Forks and Dependabot never receive project-analysis secrets. Their unit,
+      # lint, package and image checks still run. Main and all deployments gate.
+      run_sonar: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && vars.SONAR_PR_ANALYSIS == 'true') }}
+      sonar_host_url: ${{ vars.SONAR_HOST_URL }}
+    secrets: inherit

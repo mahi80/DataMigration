@@ -1,0 +1,55 @@
+{
+  "spec_version": 1,
+  "name": "customers-snapshot",
+  "mode": "snapshot",
+  "workload": "lakehouse",
+  "source": {
+    "kind": "databricks",
+    "url_env": "SOURCE_URL"
+  },
+  "target": {
+    "kind": "databricks",
+    "url_env": "TARGET_URL"
+  },
+  "policy": {
+    "source_quiesced": true,
+    "batch_size": 500,
+    "max_rows_per_table": 100000,
+    "target_scope": "entire_table",
+    "allow_create_tables": false
+  },
+  "tables": [
+    {
+      "source": "migration_demo.bronze.customers",
+      "target": "migration_demo.silver.customers",
+      "keys": [
+        "customer_id"
+      ],
+      "columns": [
+        {
+          "source": "customer_id",
+          "target": "customer_id",
+          "data_type": "integer",
+          "nullable": false
+        },
+        {
+          "source": "customer_name",
+          "target": "customer_name",
+          "data_type": "string",
+          "nullable": true
+        }
+      ]
+    }
+  ],
+  "cloud": {
+    "provider": "databricks",
+    "job_id": 12345,
+    "manifest_uri": "/Volumes/migration_demo/control/manifests/customers-v1.json",
+    "catalog": "migration_demo",
+    "schema": "silver",
+    "source_versions": {
+      "migration_demo.bronze.customers": 0
+    },
+    "job_parameters": {}
+  }
+}

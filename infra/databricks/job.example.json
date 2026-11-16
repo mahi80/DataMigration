@@ -1,0 +1,26 @@
+{
+  "name": "migration-reviewed-delta-snapshot",
+  "max_concurrent_runs": 1,
+  "parameters": [
+    {"name": "migration_manifest_uri", "default": ""},
+    {"name": "migration_plan_hash", "default": ""},
+    {"name": "migration_operation_id", "default": ""}
+  ],
+  "tasks": [
+    {
+      "task_key": "migrate_reviewed_delta_tables",
+      "existing_cluster_id": "REPLACE-WITH-APPROVED-CLUSTER",
+      "timeout_seconds": 7200,
+      "max_retries": 0,
+      "spark_python_task": {
+        "python_file": "/Workspace/Shared/DataMigration/delta_table_job.py",
+        "source": "WORKSPACE",
+        "parameters": [
+          "--manifest", "{{job.parameters.migration_manifest_uri}}",
+          "--plan-hash", "{{job.parameters.migration_plan_hash}}",
+          "--operation-id", "{{job.parameters.migration_operation_id}}"
+        ]
+      }
+    }
+  ]
+}
